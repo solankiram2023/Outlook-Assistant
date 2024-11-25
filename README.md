@@ -11,4 +11,4 @@ Key Challenges:
 The project aims to develop an Outlook Email Management Assistant that uses Microsoft Graph API, AI, and automation to simplify and enhance email management within Outlook. The core functionalities include enabling users to interact with their inbox using natural language queries, automating tasks like email summarization, and categorization, and providing accessibility features such as audio transcription. The tool will focus on improving email organization, productivity, and accessibility within the Outlook ecosystem. The project will deliver a user-friendly application for efficient email management, without extending to other email platforms or advanced custom machine learning algorithms.
 
 ## Codelabs Link
-Codelabs documentation link: https://codelabs-preview.appspot.com/?file_id=1Ckl_CASSxnr4up4T6G9Fm9b37tqFpXIhzcsUA-ys6Hk#2
+Updated Codelabs documentation link: https://codelabs-preview.appspot.com/?file_id=1Ckl_CASSxnr4up4T6G9Fm9b37tqFpXIhzcsUA-ys6Hk#2
