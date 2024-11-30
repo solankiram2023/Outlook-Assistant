@@ -1,0 +1,1 @@
+# Allow routes to be used as a python module
