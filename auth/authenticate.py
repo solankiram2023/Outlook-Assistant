@@ -5,8 +5,9 @@ import jwt
 from httpx import Client
 from fastapi import status
 from urllib.parse import quote
-from utils.variables import load_env_vars
 from utils.logs import start_logger
+from utils.variables import load_env_vars
+from database.authstorage import save_auth_response
 
 # Logging
 logger = start_logger()
@@ -66,6 +67,7 @@ def fetch_tokens(token_type: str, request_url: str, request_data: dict, request_
             logger.info("AUTH/AUTHENTICATE - fetch_tokens() - POST request successful (200 OK response received)")
             
             auth_dict = response.json()
+            auth_dict["token_source"] = "identity_provider"
             id_token = auth_dict.get('id_token', None)
             
             if id_token:          
@@ -74,6 +76,15 @@ def fetch_tokens(token_type: str, request_url: str, request_data: dict, request_
                     options = {"verify_signature": False}
                 )
                 auth_dict['id_token_claims'] = decoded_token
+
+                # Because id_token_claims is a required parameter, save only if it is available
+                logger.info("AUTH/AUTHENTICATE - fetch_tokens() - Attempting to save response to database...")
+                storage_status = save_auth_response(auth_dict=auth_dict)
+
+                if storage_status:
+                    logger.info("AUTH/AUTHENTICATE - fetch_tokens() - Saved response to database")
+                else:
+                    logger.info("AUTH/AUTHENTICATE - fetch_tokens() - Failed to save response to database")
         
         else:
             logger.warning("AUTH/AUTHENTICATE - fetch_tokens() - POST request failed")
@@ -120,7 +131,7 @@ def request_access_tokens(auth_code: str):
     }
 
     logger.info(f"AUTH/AUTHENTICATE - request_access_tokens() - Request URL: {request_url}")
-    logger.info(f"AUTH/AUTHENTICATE - request_access_tokens() - Request Data: {request_data}")
+    # logger.info(f"AUTH/AUTHENTICATE - request_access_tokens() - Request Data: {request_data}")
 
     return fetch_tokens(
         token_type      = "access",
@@ -159,7 +170,7 @@ def refresh_access_tokens(refresh_token: str):
     }
 
     logger.info(f"AUTH/AUTHENTICATE - refresh_access_tokens() - Request URL: {request_url}")
-    logger.info(f"AUTH/AUTHENTICATE - refresh_access_tokens() - Request Data: {request_data}")
+    # logger.info(f"AUTH/AUTHENTICATE - refresh_access_tokens() - Request Data: {request_data}")
 
     return fetch_tokens(
         token_type      = "refresh",
