@@ -4,6 +4,7 @@
 import jwt
 from httpx import Client
 from fastapi import status
+from datetime import datetime
 from urllib.parse import quote
 from utils.logs import start_logger
 from utils.variables import load_env_vars
@@ -178,3 +179,39 @@ def refresh_access_tokens(refresh_token: str):
         request_data    = request_data,
         request_headers = request_headers
     )
+
+def is_token_valid(auth_dict: dict):
+    ''' Check if the access token has expired or not '''
+
+    # Is token valid?
+    is_valid = None
+
+    try:
+        if auth_dict:
+            # Convert expires_at to datetime object and then compare with current time
+            expires_at = auth_dict["expires_at"]
+            
+            if isinstance(expires_at, str):
+                expires_at = datetime.strptime(expires_at, "%Y-%m-%d %H:%M:%S")
+            
+            elif isinstance(expires_at, datetime):
+                expires_at = expires_at
+            
+            else:
+                raise ValueError("The value for 'expires_at' must be either a string or datetime object")
+            
+            current_time = datetime.now()
+            
+            if current_time < expires_at:
+                logger.info(f"AUTH/AUTHENTICATE - is_token_valid() - Token for user {str(auth_dict["email"])} is still valid")
+                is_valid = True
+            
+            else:
+                logger.warning(f"AUTH/AUTHENTICATE - is_token_valid() - Token for user {str(auth_dict["email"])} has expired")
+                is_valid = False
+
+    except Exception as exception:
+        logger.error(f"AUTH/AUTHENTICATE - is_token_valid() - Exception occurred while checking if token has expired (See exception below)")
+        logger.error(f"AUTH/AUTHENTICATE - is_token_valid() - {exception}")
+    
+    return is_valid
