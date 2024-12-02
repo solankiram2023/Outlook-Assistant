@@ -259,7 +259,7 @@ def dequeue_job():
                     result = result[0]
                 
                 else:
-                    logger.info(f"DATABASE/JOBS - dequeue_job() - No pending jobs found")
+                    logger.warning(f"DATABASE/JOBS - dequeue_job() - No pending jobs found")
                     result = None
 
 
