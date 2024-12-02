@@ -1,0 +1,1 @@
+# Allow database to be used as a python module
