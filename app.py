@@ -23,8 +23,8 @@ app.add_middleware(
 )
 
 # Attach routes to the application
-app.include_router(extras.router)
-app.include_router(auth.router)
+app.include_router(router=extras.router)
+app.include_router(router=auth.router)
 
 # Run the server manually with Uvicorn
 if __name__ == "__main__":
