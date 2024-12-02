@@ -12,18 +12,21 @@ def start_logger():
 
     # Logger configuration
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    
+    # If logger already exists, return that instead of creating a new one
+    if not logger.hasHandlers():
+        logger.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-    # Log to console (DEV only)
-    if env["APP_ENV"] == "DEV":
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        # Log to console (DEV only)
+        if env["APP_ENV"] == "DEV":
+            handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
 
-    # Also log to a file
-    file_handler = logging.FileHandler(env['LOG_FILE'])
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+        # Also log to a file
+        file_handler = logging.FileHandler(env['LOG_FILE'])
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
     return logger
