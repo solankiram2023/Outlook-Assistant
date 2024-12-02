@@ -4,14 +4,14 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from auth.authenticate import request_auth_token, request_access_tokens, refresh_access_tokens
 
+# Start the router
+router  = APIRouter()
+
 # Logging
 logger = start_logger()
 
 # Load env
 env = load_env_vars()
-
-# Start the router
-router  = APIRouter()
 
 @router.get(
     path        = env["SIGN_IN_ENDPOINT"],
