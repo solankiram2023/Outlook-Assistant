@@ -90,7 +90,8 @@ def delete_job(job_id: int):
             logger.error(f"DATABASE/JOBS - delete_job() - Failed to delete job from the queue (See exception below)")
             logger.error(f"DATABASE/JOBS - delete_job() - {exception}")
 
-            # Add logic here to mark job as failed if deletion fails
+            # Because deleting this job failed, we'll attempt to mark it as failed to ignore future processing
+            update_job(job_id=job_id, status=env['JOB_FAILED'])
 
         finally:
             close_connection(conn=conn)
@@ -119,7 +120,6 @@ def fetch_user_via_job(job_id: int):
                         WHERE id = %s AND status = %s LIMIT 1
                     );
                 """
-                
                 logger.info(f"DATABASE/JOBS - fetch_job() - Fetching user data via job_id...")
                 
                 cursor.execute(query, (job_id, env['DEFAULT_JOB_STATUS']))
@@ -144,11 +144,49 @@ def fetch_user_via_job(job_id: int):
 
     return result
 
+def update_job(job_id: int, status:str):
+    ''' Update job status based on job_id '''
+
+    logger.info(f"DATABASE/JOBS - update_job() - Updating status for job_id {job_id} to {status}")
+
+    # Start a connection
+    conn = open_connection()
+
+    if conn:
+        try:
+
+            with conn.cursor() as cursor:
+                logger.info(f"DATABASE/JOBS - update_job() - Preparing SQL query to fetch job...")
+
+                query = """
+                    UPDATE queued_jobs
+                    SET status = %s
+                    WHERE id = %s;
+                """
+                logger.info(f"DATABASE/JOBS - update_job() - Updating status for job_id...")
+                
+                cursor.execute(query, (status, job_id))
+                conn.commit()
+
+                if cursor.rowcount > 0:
+                    logger.info(f"DATABASE/JOBS - update_job() - Successfully updated status for job_id {job_id}")
+
+                else:
+                    logger.error(f"DATABASE/JOBS - update_job() - job_id {job_id} not found or status is already '{status}'")
+        
+        except Exception as exception:
+            logger.error(f"DATABASE/JOBS - update_job() - Failed to update the status for job_id {job_id} (See exception below)")
+            logger.error(f"DATABASE/JOBS - update_job() - {exception}") 
+
+        finally:
+            close_connection(conn=conn)
+
 def trigger_airflow(job_id: int):
     ''' Send user token to Airflow via API and trigger the DAG '''
 
     logger.info(f"DATABASE/JOBS - trigger_airflow() - Triggering Airflow for job_id {job_id} from queued jobs")
     data_dict = fetch_user_via_job(job_id=job_id)
+    dispatch_status = False
     
     if data_dict:
         payload = {
@@ -178,7 +216,9 @@ def trigger_airflow(job_id: int):
             
             if response.status_code == status.HTTP_200_OK:
                 logger.info(f"DATABASE/JOBS - trigger_airflow() - Successfully sent data to Airflow")
-                # write a function to update status in the table
+                update_job(job_id=job_id, status=env['JOB_SUCCESSFUL'])
+                dispatch_status = True
+            
             else:
                 logger.info(f"DATABASE/JOBS - trigger_airflow() - Failed to send data to Airflow (See error below)")
                 logger.info(f"DATABASE/JOBS - trigger_airflow() - {response.text}")
@@ -186,3 +226,82 @@ def trigger_airflow(job_id: int):
         except Exception as exception:
             logger.error(f"DATABASE/JOBS - trigger_airflow() - Exception occurred while attempting to send user data to Airflow")
             logger.error(f"DATABASE/JOBS - trigger_airflow() - {exception}")
+    
+    return dispatch_status
+
+def dequeue_job():
+    ''' Fetch the topmost job marked as 'pending' '''
+
+    logger.info(f"DATABASE/JOBS - dequeue_job() - Fetching first job_id marked as {env['DEFAULT_JOB_STATUS']}")
+
+    # Start a connection
+    conn = open_connection()
+
+    # Fetched job result
+    result = None
+
+    if conn:
+        try:
+            
+            with conn.cursor() as cursor:
+                logger.info(f"DATABASE/JOBS - fetch_job() - Preparing SQL query to fetch first job...")
+
+                query = """
+                    SELECT id FROM queued_jobs
+                    WHERE status = %s ORDER BY id ASC LIMIT 1
+                """
+                logger.info(f"DATABASE/JOBS - fetch_job() - Fetching first job...")
+                
+                cursor.execute(query, (env['DEFAULT_JOB_STATUS'],))
+                result = cursor.fetchone()
+
+                if result:
+                    result = result[0]
+                
+                else:
+                    logger.info(f"DATABASE/JOBS - dequeue_job() - No pending jobs found")
+                    result = None
+
+
+        except Exception as exception:
+            logger.error(f"DATABASE/JOBS - delete_job() - Failed to fetch first job_id from the queue (See exception below)")
+            logger.error(f"DATABASE/JOBS - delete_job() - {exception}")
+        
+        finally:
+            close_connection(conn=conn)
+
+    return result
+
+def delete_failed_jobs():
+    """ Delete jobs from the queued_jobs table where status = 'failed' """
+    
+    logger.info(f"DATABASE/JOBS - delete_failed_jobs() - Deleting jobs with status 'failed'")
+
+    # Start a connection
+    conn = open_connection()
+
+    if conn:
+        try:
+            
+            with conn.cursor() as cursor:
+                logger.info(f"DATABASE/JOBS - delete_failed_jobs() - Preparing SQL query to delete failed jobs...")
+
+                query = """
+                    DELETE FROM queued_jobs
+                    WHERE status = %s
+                """
+                logger.info(f"DATABASE/JOBS - delete_failed_jobs() - Deleting failed jobs...")
+                
+                cursor.execute(query, (env['JOB_FAILED'],))
+                conn.commit()
+
+                # Log how many rows were deleted
+                rows_deleted = cursor.rowcount
+                logger.info(f"DATABASE/JOBS - delete_failed_jobs() - {rows_deleted} job(s) deleted with status 'failed'")
+
+        except Exception as exception:
+            logger.error(f"DATABASE/JOBS - delete_failed_jobs() - Failed to delete failed jobs (See exception below)")
+            logger.error(f"DATABASE/JOBS - delete_failed_jobs() - {exception}")
+        
+        finally:
+            close_connection(conn=conn)
