@@ -1,0 +1,3 @@
+# Assuming python==3.12
+fastapi[standard]
+azure-identity
