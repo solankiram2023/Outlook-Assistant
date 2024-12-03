@@ -833,12 +833,7 @@ def main():
 
     logger.info("Airflow - main() - Email attachments processed and uploaded to S3 successfully")
 
-     
-
 logger.info("Airflow - main() - Workflow completed")
-
-
-
 
 if __name__ == '__main__':
     main()
