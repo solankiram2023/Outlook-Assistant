@@ -81,7 +81,7 @@ def fetch_emails(access_token):
 
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "Prefer": 'outlook.body-content-type="html"',
+        "Prefer": 'outlook.body-content-type="html", IdType="ImmutableId"',
         "Content-Type": "application/json",
     }
 

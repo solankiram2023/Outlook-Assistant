@@ -1,12 +1,13 @@
 import os
+import ast
 import time
 import json
 import uuid
+import psycopg2
 from utils import start_logger
 from dotenv import load_dotenv
-import psycopg2
+from vectors import create_embeddings_and_index
 from psycopg2.errors import Error, IoError
-import ast
 
 # Load env
 load_dotenv()
@@ -91,44 +92,46 @@ def create_tables_in_db():
                     token_source VARCHAR(50),
                     issued_at TIMESTAMP,
                     expires_at TIMESTAMP,
-                    nonce VARCHAR(255)
+                    nonce VARCHAR(255),
+                    indexing_completed BOOLEAN DEFAULT FALSE
             );
                 """,
                 "create_emails_table": """
                 CREATE TABLE IF NOT EXISTS emails (
-                    body TEXT,
-                    body_preview TEXT,
-                    change_key VARCHAR(255),
+                    body TEXT DEFAULT NULL,
+                    body_preview TEXT DEFAULT NULL,
+                    change_key VARCHAR(255) DEFAULT NULL,
                     content_type VARCHAR(255) DEFAULT 'html',
-                    conversation_id VARCHAR(255),
-                    conversation_index TEXT,
-                    created_datetime TIMESTAMPTZ,
-                    created_datetime_timezone VARCHAR(50),
-                    end_datetime TIMESTAMPTZ,
-                    end_datetime_timezone VARCHAR(50),
+                    conversation_id VARCHAR(255) DEFAULT NULL,
+                    conversation_index TEXT DEFAULT NULL,
+                    created_datetime TIMESTAMPTZ DEFAULT NULL,
+                    created_datetime_timezone VARCHAR(50) DEFAULT NULL,
+                    end_datetime TIMESTAMPTZ DEFAULT NULL,
+                    end_datetime_timezone VARCHAR(50) DEFAULT NULL,
                     has_attachments BOOLEAN DEFAULT FALSE,
                     id VARCHAR(255) PRIMARY KEY,
-                    importance VARCHAR(50),
-                    inference_classification VARCHAR(50),
+                    importance VARCHAR(50) DEFAULT NULL,
+                    inference_classification VARCHAR(50) DEFAULT NULL,
                     is_draft BOOLEAN DEFAULT FALSE,
-                    is_read BOOLEAN,
-                    is_all_day BOOLEAN,
-                    is_out_of_date BOOLEAN,
-                    meeting_message_type VARCHAR(255),
-                    meeting_request_type VARCHAR(255),
-                    odata_etag TEXT,
-                    odata_value TEXT,
-                    parent_folder_id VARCHAR(255),
-                    received_datetime TIMESTAMPTZ,
-                    recurrence TEXT,
-                    reply_to TEXT,
-                    response_type VARCHAR(50),
-                    sent_datetime TIMESTAMPTZ,
-                    start_datetime TIMESTAMPTZ,
-                    start_datetime_timezone VARCHAR(50),
-                    subject TEXT,
-                    type VARCHAR(50),
-                    web_link TEXT
+                    is_read BOOLEAN DEFAULT NULL,
+                    is_all_day BOOLEAN DEFAULT NULL,
+                    is_out_of_date BOOLEAN DEFAULT NULL,
+                    meeting_message_type VARCHAR(255) DEFAULT NULL,
+                    meeting_request_type VARCHAR(255) DEFAULT NULL,
+                    odata_etag TEXT DEFAULT NULL,
+                    odata_value TEXT DEFAULT NULL,
+                    parent_folder_id VARCHAR(255) DEFAULT NULL,
+                    received_datetime TIMESTAMPTZ DEFAULT NULL,
+                    recurrence TEXT DEFAULT NULL,
+                    reply_to TEXT DEFAULT NULL,
+                    response_type VARCHAR(50) DEFAULT NULL,
+                    sent_datetime TIMESTAMPTZ DEFAULT NULL,
+                    start_datetime TIMESTAMPTZ DEFAULT NULL,
+                    start_datetime_timezone VARCHAR(50) DEFAULT NULL,
+                    subject TEXT DEFAULT NULL,
+                    type VARCHAR(50) DEFAULT NULL,
+                    web_link TEXT DEFAULT NULL,
+                    vector_indexed BOOLEAN DEFAULT FALSE
                 );
                 """,
                 "create_recipients_table": """
@@ -155,7 +158,8 @@ def create_tables_in_db():
                     name TEXT,
                     content_type TEXT,
                     size BIGINT,
-                    bucket_url TEXT
+                    bucket_url TEXT,
+                    vector_indexed BOOLEAN DEFAULT FALSE
                 );
                 """,
                 "create_flags_table": """
@@ -219,6 +223,7 @@ def load_users_tokendata_to_db(formatted_token_response):
     logger.info("Airflow - load_users_tokendata_to_db() - Creating database connection")
 
     conn = create_connection_to_postgresql()
+    user_email = None
 
     if conn:
         try:
@@ -237,12 +242,16 @@ def load_users_tokendata_to_db(formatted_token_response):
             """
             cursor.execute(insert_query, formatted_token_response)
             conn.commit()
+            user_email = formatted_token_response['email']
             logger.info("Airflow - load_users_tokendata_to_db() - Token data inserted successfully in USERS table")
 
         except Exception as e:
             logger.error(f"Airflow - load_users_tokendata_to_db() - Error inserting token data into the users table = {e}")
         finally:
             close_connection(conn, cursor)
+    
+    return user_email
+
 
 # Function to load email data into EMAILS table
 def insert_email_data(email_data):
@@ -373,52 +382,50 @@ def insert_flags_data(flags_data):
 
 
 # Function to load emails info
-def load_email_info_to_db(formatted_mail_responses):
+def load_email_info_to_db(formatted_mail_responses, user_email):
 
     logger.info("Airflow - load_email_info_to_db() - Loading mail information into the database")
 
     for email in formatted_mail_responses.get("value", []):
 
+        # Email data
         email_data = {
             "id"                        : email.get("id"),
-            "content_type"              : email.get("body", {}).get("contentType", "html"),
-            "body"                      : email.get("body", {}).get("content", ""),
-            "body_preview"              : email.get("bodyPreview", ""),
-            "change_key"                : email.get("changeKey", ""),
-            "conversation_id"           : email.get("conversationId", ""),
-            "conversation_index"        : email.get("conversationIndex", ""),
+            "content_type"              : email.get("body", None).get("contentType", "html"),
+            "body"                      : email.get("body", None).get("content", ""),
+            "body_preview"              : email.get("bodyPreview", None),
+            "change_key"                : email.get("changeKey", None),
+            "conversation_id"           : email.get("conversationId", None),
+            "conversation_index"        : email.get("conversationIndex", None),
             "created_datetime"          : email.get("createdDateTime", None) or None,
             "created_datetime_timezone" : email.get("createdDateTime", None) or None,
             "end_datetime"              : email.get("endDateTime", {}).get("dateTime", None) or None,
             "end_datetime_timezone"     : email.get("endDateTime", {}).get("timeZone", None) or None,
             "has_attachments"           : email.get("hasAttachments", False),
-            "importance"                : email.get("importance", ""),
-            "inference_classification"  : email.get("inferenceClassification", ""),
+            "importance"                : email.get("importance", None),
+            "inference_classification"  : email.get("inferenceClassification", None),
             "is_draft"                  : email.get("isDraft", False),
             "is_read"                   : email.get("isRead", False),
             "is_all_day"                : email.get("isAllDay", False),
             "is_out_of_date"            : email.get("isOutOfDate", False),
-            "meeting_message_type"      : email.get("meetingMessageType", ""),
-            "meeting_request_type"      : email.get("meetingRequestType", ""),
-            "odata_etag"                : email.get("@odata.etag", ""),
-            "odata_value"               : email.get("@odata.value", ""),
-            "parent_folder_id"          : email.get("parentFolderId", ""),
+            "meeting_message_type"      : email.get("meetingMessageType", None),
+            "meeting_request_type"      : email.get("meetingRequestType", None),
+            "odata_etag"                : email.get("@odata.etag", None),
+            "odata_value"               : email.get("@odata.value", None),
+            "parent_folder_id"          : email.get("parentFolderId", None),
             "received_datetime"         : email.get("receivedDateTime", None) or None,
-            "recurrence"                : json.dumps(email.get("recurrence", {})),
-            "reply_to"                  : json.dumps(email.get("replyTo", [])),
-            "response_type"             : email.get("responseType", ""),
+            "recurrence"                : json.dumps(email.get("recurrence")) if email.get("recurrence", None) else None,
+            "reply_to"                  : json.dumps(email.get("replyTo")) if email.get("replyTo", None) else None,
+            "response_type"             : email.get("responseType", None),
             "sent_datetime"             : email.get("sentDateTime", None) or None,
             "start_datetime"            : email.get("startDateTime", {}).get("dateTime", None) or None,
             "start_datetime_timezone"   : email.get("startDateTime", {}).get("timeZone", None) or None,
-            "subject"                   : email.get("subject", ""),
-            "type"                      : email.get("type", ""),
-            "web_link"                  : email.get("webLink", "")
+            "subject"                   : email.get("subject", None),
+            "type"                      : email.get("type", None),
+            "web_link"                  : email.get("webLink", None)
         }
 
-        logger.info(f"Airflow - load_email_info_to_db() - Loading mail contents to EMAILS table in database")
-        insert_email_data(email_data)
-        logger.info(f"Airflow - load_email_info_to_db() - Email contents uploaded to EMAILS table in database")
-
+        # Sender data
         sender_info = email.get("sender", {}).get("emailAddress", {})
         sender_dict = ast.literal_eval(sender_info)
         sender_data = {
@@ -427,10 +434,6 @@ def load_email_info_to_db(formatted_mail_responses):
             "email_address" : sender_dict.get("address", ""),
             "name"          : sender_dict.get("name", "")
         }
-        logger.info(f"Airflow - load_email_info_to_db() - Loading sender contents to SENDERS table in database")
-        insert_sender_data(sender_data)
-        logger.info(f"Airflow - load_email_info_to_db() - Sender contents uploaded to SENDERS table in database")
-
 
         recipients_data = []
         for recipient_type, recipients_key in [("to", "toRecipients"), ("cc", "ccRecipients"), ("bcc", "bccRecipients")]:
@@ -444,18 +447,51 @@ def load_email_info_to_db(formatted_mail_responses):
                     "email_address" : recipient_dict.get('address', ""),
                     "name"          : recipient_dict.get('name', "")
                 })
-        logger.info(f"Airflow - load_email_info_to_db() - Loading recipient contents to RECIPIENTS table in database")
-        insert_recipient_data(recipients_data)
-        logger.info(f"Airflow - load_email_info_to_db() - recipient contents uploaded to RECIPIENTS table in database")
-
 
         flag_data = {
             "email_id": email.get("id", ""),
             "flag_status": email.get("flag", {}).get("flagStatus","")
         }
+
+        # Insert email data into Postgres
+        logger.info(f"Airflow - load_email_info_to_db() - Loading mail contents to EMAILS table in database")
+        insert_email_data(email_data)
+        logger.info(f"Airflow - load_email_info_to_db() - Email contents uploaded to EMAILS table in database")
+
+        # Insert sender data into Postgres
+        logger.info(f"Airflow - load_email_info_to_db() - Loading sender contents to SENDERS table in database")
+        insert_sender_data(sender_data)
+        logger.info(f"Airflow - load_email_info_to_db() - Sender contents uploaded to SENDERS table in database")
+
+        # Insert recipient data into Postgres
+        logger.info(f"Airflow - load_email_info_to_db() - Loading recipient contents to RECIPIENTS table in database")
+        insert_recipient_data(recipients_data)
+        logger.info(f"Airflow - load_email_info_to_db() - recipient contents uploaded to RECIPIENTS table in database")
+
+        # Insert flag data into Postgres
         logger.info(f"Airflow - load_email_info_to_db() - Loading flags contents to FLAGS table in database")
         insert_flags_data(flag_data)
         logger.info(f"Airflow - load_email_info_to_db() - flags contents uploaded to FLAGS table in database")
+
+        # Finally, index the email contents in Milvus
+        data_to_index = {
+            "subject"           : email_data["subject"],
+            "body"              : email_data["body"],
+            "reply_to"          : email_data["reply_to"],
+            "created_datetime"  : email_data["created_datetime"],
+            "received_datetime" : email_data["received_datetime"],
+            "sent_datetime"     : email_data["sent_datetime"],
+        }
+
+        metadata = {
+            "id"                    : email_data["id"],
+            "user_email"            : user_email,
+            "conversation_id"       : email_data["conversation_id"],
+            "conversation_index"    : email_data["conversation_index"],
+            "message_type"          : "email"
+        }
+
+        create_embeddings_and_index(data_to_index=data_to_index, metadata=metadata)
 
 def insert_attachment_data(conn, attachment_id, email_id, file_name, content_type, size, s3_url):
     """

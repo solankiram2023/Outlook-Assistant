@@ -36,7 +36,7 @@ def main():
     logger.info(f"Airflow - main() - Tables created successfully")
 
     logger.info("Airflow - main() - Calling load_users_tokendata_to_db() function")
-    load_users_tokendata_to_db(formatted_token_response)
+    user_email = load_users_tokendata_to_db(formatted_token_response)
     logger.info(f"Airflow - main() - Formatted Token data with respect to user is loaded into USERS table")
 
     logger.info("Airflow - main() - Calling fetch_emails() function")
@@ -46,7 +46,7 @@ def main():
     save_emails_to_json_file(formatted_mail_responses, "mail_responses.json")
     # print(formatted_mail_responses)
 
-    load_email_info_to_db(formatted_mail_responses)
+    load_email_info_to_db(formatted_mail_responses, user_email)
     # Fetch emails with attachments
     emails_with_attachments = process_emails_with_attachments(access_token, s3_bucket_name)
     logger.info("Airflow - main() - processing emails with attachments")
