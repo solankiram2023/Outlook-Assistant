@@ -8,6 +8,7 @@ from database.setupTables import create_tables_in_db
 from database.loadtoDB import load_users_tokendata_to_db
 from services.processEmails import process_emails
 from services.processEmailAttachments import process_emails_with_attachments
+from services.extractAttachments import extract_contents_from_attachments
 
 # Load dotenv file
 load_dotenv()
@@ -45,6 +46,8 @@ def main():
     logger.info("Airflow - main() - processing emails with attachments")
     process_emails_with_attachments(logger, access_token, s3_bucket_name)
     logger.info("Airflow - main() - Email attachments processed and uploaded to S3 successfully")
+
+    # extract_contents_from_attachments(logger)
 
 logger.info("Airflow - main() - Workflow completed")
 

@@ -1,8 +1,11 @@
 import os
 import boto3
+import base64
 import requests
 
 from database.connectDB import create_connection_to_postgresql, close_connection
+from services.processEmails import save_emails_to_json_file
+from services.extractAttachments import download_attachments_from_s3
 
 def fetch_emails_with_attachments(logger):
     logger.info(f"Airflow - services/processEmailAttachments.py - fetch_emails_with_attachments() - Fetching mails with attachments")
@@ -43,10 +46,8 @@ def fetch_emails_with_attachments(logger):
         return []
     
 
-def insert_attachment_data(logger, conn, attachment_id, email_id, file_name, content_type, size, s3_url):
-    """
-    Insert attachment data into the attachments table.
-    """
+def insert_attachment_data(logger, attachment_id, email_id, file_name, content_type, size, s3_url):
+    conn = create_connection_to_postgresql()
     insert_query = """
         INSERT INTO attachments (id, email_id, name, content_type, size, bucket_url)
         VALUES (%s, %s, %s, %s, %s, %s)
@@ -60,12 +61,9 @@ def insert_attachment_data(logger, conn, attachment_id, email_id, file_name, con
         logger.error(f"Failed to insert attachment {file_name} into database. Error: {e}")
         conn.rollback()
     finally:
-        cursor.close()
+        close_connection(conn, cursor)
 
 def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, access_token):
-    """
-    Upload attachments of a given email ID to an S3 bucket and insert the attachment details into the database.
-    """
     logger.info(f"Processing attachments for email ID: {email_id}")
 
     # Initialize S3 client
@@ -73,6 +71,7 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
 
     # Fetch attachments using Microsoft Graph API
     attachment_url = f"https://graph.microsoft.com/v1.0/me/messages/{email_id}/attachments"
+
     response = requests.get(
         attachment_url,
         headers={"Authorization": f"Bearer {access_token}"},
@@ -82,7 +81,10 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
     if response.status_code != 200:
         logger.error(f"Failed to fetch attachments for email ID: {email_id}. Response: {response.text}")
         return
+    
+    save_emails_to_json_file(logger, response.json(), f"{email_id}_attachments")
 
+    # save_emails_to_json_file(logger, response.json(), f"{email_id}_with_attachments.json")
     attachments = response.json().get("value", [])
     if not attachments:
         logger.info(f"No attachments found for email ID: {email_id}.")
@@ -99,6 +101,8 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
         "Video": [".mp4", ".webm"],
     }
 
+    # AAMkADAwMDQ2ZGIxLWJmOGItNDIxNi1iNTViLWZlYmM1MGZkOThhMQBGAAAAAADQ7gFJgmUpRLiI6hPnJZbrBwDJGJpQ8Ew2SZhsU6Pge63-AAAAAAEJAADJGJpQ8Ew2SZhsU6Pge63-AAESiAhuAAA=
+
     # Define base directory structure
     base_dir = f"{user_email}/{email_id}/attachments"
 
@@ -111,12 +115,6 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
     for sub_dir in subdirectories.values():
         s3_client.put_object(Bucket=s3_bucket_name, Key=f"{sub_dir}/")
 
-    # Connect to the database
-    conn = create_connection_to_postgresql()
-    if not conn:
-        logger.error("Failed to connect to the PostgreSQL database. Exiting function.")
-        return
-
     # Upload attachments to S3 and insert data into the database
     for attachment in attachments:
         attachment_id = attachment.get("id")
@@ -127,6 +125,19 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
 
         if not file_name or not content_bytes:
             continue
+
+        file_contents = base64.b64decode(content_bytes)
+
+        # Save the file locally
+        if not os.path.isdir(os.path.join(os.getcwd(), "tmp")):
+            logger.info(f"creating local directory: {os.path.join(os.getcwd(), 'tmp')}")
+            os.makedirs(os.path.join(os.getcwd(), "tmp"))
+
+        local_file_path = os.path.join(os.getcwd(), f"tmp/{file_name}")  # Use /tmp or a preferred directory
+        logger.info(f"Storing attachments contents into local file: {local_file_path}")
+        with open(local_file_path, "wb") as f:
+            f.write(file_contents)
+        logger.info(f"Files uploaded to  {local_file_path}")
 
         # Determine the target directory based on file type
         target_dir = None
@@ -140,25 +151,22 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
             continue
 
         try:
-            # Upload file to the S3 directory
-            s3_client.put_object(
-                Bucket=s3_bucket_name,
-                Key=f"{target_dir}/{file_name}",
-                Body=content_bytes.encode("utf-8"),
-            )
+            s3_key = f"{target_dir}/{file_name}"
+            s3_client.upload_file(local_file_path, s3_bucket_name, s3_key)
 
             # Fetch the S3 URL for the uploaded file
-            s3_url = f"s3://{s3_bucket_name}/{target_dir}/{file_name}"
+            s3_url = f"s3://{s3_bucket_name}/{s3_key}"
 
             # Log the upload details
             logger.info(f"[SUCCESS] Uploaded attachment {file_name} (ID: {attachment_id}) to S3 bucket {s3_bucket_name}.")
             logger.info(f"Attachment Details: ID: {attachment_id}, Name: {file_name}, Content Type: {content_type}, Size: {size} bytes, S3 URL: {s3_url}")
 
             # Insert the attachment details into the database
-            insert_attachment_data(logger, conn, attachment_id, email_id, file_name, content_type, size, s3_url)
+            insert_attachment_data(logger, attachment_id, email_id, file_name, content_type, size, s3_url)    
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to upload {file_name} for email ID: {email_id}. Error: {e}")
+
 
 def process_emails_with_attachments(logger, access_token, s3_bucket_name):
     logger.info(f"Airflow - services/processEmailAttachments.py - process_emails_with_attachments() - Processing mails with attachments")
@@ -169,5 +177,6 @@ def process_emails_with_attachments(logger, access_token, s3_bucket_name):
     # Process each email's attachments
     for user_email, email_id, has_attachments in emails_with_attachments:
         if has_attachments:
-            logger.info(f"Airflow - services/processEmailAttachments.py - process_emails_with_attachments() - Fetching mails with attachments")
+            logger.info(f"Airflow - services/processEmailAttachments.py - process_emails_with_attachments() - Fetching mails with attachments for email - {user_email}, mail-id - {email_id}")
             upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, access_token)
+            download_attachments_from_s3(logger, user_email, email_id, s3_bucket_name)

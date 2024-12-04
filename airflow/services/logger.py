@@ -23,7 +23,7 @@ def start_logger():
             logger.addHandler(handler)
 
         # Also log to a file
-        file_handler = logging.FileHandler(os.getenv("LOG_FILE", "airflow_logs.log"))
+        file_handler = logging.FileHandler(os.getenv("LOG_FILE", "airflow_logs.log"), mode="w")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
