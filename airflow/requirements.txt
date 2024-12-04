@@ -4,3 +4,6 @@ requests
 beautifulsoup4
 chardet
 boto3
+pymilvus==2.5.0
+openai
+unidecode
