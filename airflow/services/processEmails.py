@@ -116,7 +116,7 @@ def save_emails_to_json_file(logger, email_data, file_name):
         logger.error(f"Airflow - services/processEmails.py - save_emails_to_json_file() - Error saving email data to JSON file: {e}")
 
 
-def process_emails(logger, access_token):
+def process_emails(logger, access_token, user_email):
     logger.info(f"Airflow - services/processEmails.py - process_emails() - Processing emails")
 
     logger.info(f"Airflow - services/processEmails.py - process_emails() - Fetching emails with access token")
@@ -127,4 +127,4 @@ def process_emails(logger, access_token):
     save_emails_to_json_file(logger, formatted_mail_responses, "mail_responses.json")
 
     logger.info(f"Airflow - services/processEmails.py - process_emails() - Loading mail data into PostgreSQL database")
-    load_email_info_to_db(logger, formatted_mail_responses)
+    load_email_info_to_db(logger, formatted_mail_responses, user_email)

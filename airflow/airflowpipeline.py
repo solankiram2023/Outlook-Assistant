@@ -36,11 +36,11 @@ def main():
     logger.info(f"Airflow - main() - Tables created successfully")
 
     logger.info("Airflow - main() - Calling load_users_tokendata_to_db() function")
-    load_users_tokendata_to_db(logger, formatted_token_response)
+    user_email = load_users_tokendata_to_db(logger, formatted_token_response)
     logger.info(f"Airflow - main() - Formatted Token data with respect to user is loaded into USERS table")
 
     logger.info("Airflow - main() - Calling process_email_response() function")
-    process_emails(logger, access_token)
+    process_emails(logger, access_token, user_email)
 
     # Fetch emails with attachments
     logger.info("Airflow - main() - processing emails with attachments")
