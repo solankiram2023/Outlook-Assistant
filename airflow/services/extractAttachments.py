@@ -4,7 +4,7 @@ import csv
 import boto3
 
 
-from services.extractFileContents import parse_images, parse_csv_files
+from services.extractFileContents import parse_images, parse_csv_files, parse_json_files
 
 # Function to create directories
 def create_local_directory(logger, directory_path):
@@ -48,18 +48,30 @@ def extract_contents_from_file(logger, file_path):
     content = ""
 
     try:
-        if file_extension == ".pdf":
-            # Extract content from PDF files
-            content = "PDF"
-        elif file_extension == ".csv":
-            # Extract content from CSV files
-            content = parse_csv_files(logger, file_path)
-        elif file_extension in [".json"]:
-            # Extract content from JSON files
-            content = "txt"
+        if file_extension in [".json"]:
+            logger.info("Parsing JSON files")
+            content = parse_json_files(logger, file_path)
         elif file_extension in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"]:
-            # Extract content from image files
+            logger.info("Parsing Images")
             content = parse_images(logger, file_path)
+        elif file_extension in [".csv"]:
+            logger.info("Parsing CSV files")
+            content = parse_csv_files(logger, file_path)
+        elif file_extension in [".doc", ".docx", ".pdf", ".rtf", ".txt", ".xml"]:
+            logger.info(f"Parsing Documents with extension: {file_extension}")
+            content = f"{file_extension}_file"
+        elif file_extension in [".xls", ".xlsm", ".xlsx"]:
+            logger.info(f"Parsing Spreadsheets")
+            content = "SpreadSheets"
+        elif file_extension in [".ppt", ".pptx", ".ppsx"]:
+            logger.info(f"Parsing Presentations")
+            content = "PPTs"
+        elif file_extension in [".mp3", ".wav"]:
+            logger.info(f"Parsing Audios")
+            content = "Audios"
+        elif file_extension in [".mp4", ".webm"]:
+            logger.info(f"Parsing Videos")
+            content = "Videos"
         else:
             content = f"Unsupported file type: {file_extension}"
     except Exception as e:
@@ -101,7 +113,7 @@ def extract_filepaths_with_attachments(logger, download_dir):
                         file_path = os.path.join(file_types_dir, file)
                         logger.info(f"Airflow - services/extractAttachments.py - extract_filepaths_with_attachments() - Processing file: {file_path}")
                         content = extract_contents_from_file(logger, file_path)
-                        print(content)
+                        logger.info(f"Extracted contents from {file} is {content}")
                 else:
                     continue
             else:

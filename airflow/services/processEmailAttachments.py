@@ -100,9 +100,7 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
         "Audio": [".mp3", ".wav"],
         "Video": [".mp4", ".webm"],
     }
-
-    # AAMkADAwMDQ2ZGIxLWJmOGItNDIxNi1iNTViLWZlYmM1MGZkOThhMQBGAAAAAADQ7gFJgmUpRLiI6hPnJZbrBwDJGJpQ8Ew2SZhsU6Pge63-AAAAAAEJAADJGJpQ8Ew2SZhsU6Pge63-AAESiAhuAAA=
-
+    
     # Define base directory structure
     base_dir = f"{user_email}/{email_id}/attachments"
 
