@@ -4,7 +4,8 @@ import csv
 import boto3
 
 
-from services.extractFileContents import parse_images, parse_csv_files, parse_json_files
+from services.extractFileContents import parse_images, parse_csv_files, parse_word_file, parse_txt_files, parse_excel_files, parse_pdf_files
+from services.processEmails import save_emails_to_json_file
 
 # Function to create directories
 def create_local_directory(logger, directory_path):
@@ -47,32 +48,36 @@ def extract_contents_from_file(logger, file_path):
     file_extension = os.path.splitext(file_path)[-1].lower()  # Get file extension
     content = ""
 
+    file_extensions = {
+        "PDFs":  [".pdf"],
+        "Images":  [".png", ".jpg", ".jpeg"],
+        "Docs": [".doc", ".docx"],
+        "TextFiles": [".txt"],
+        "SpreadSheets": [".xls", ".xlsx"],
+        "CSVFiles": ['.csv'],
+    }
+
     try:
-        if file_extension in [".json"]:
-            logger.info("Parsing JSON files")
-            content = parse_json_files(logger, file_path)
-        elif file_extension in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"]:
-            logger.info("Parsing Images")
+        if file_extension in file_extensions["PDFs"]:
+            logger.info("Parsing PDF file")
+            content = parse_pdf_files(logger, file_path)
+        elif file_extension in file_extensions["Images"]:
+            logger.info("Parsing Image file")
             content = parse_images(logger, file_path)
-        elif file_extension in [".csv"]:
-            logger.info("Parsing CSV files")
+        elif file_extension in file_extensions["Docs"]:
+            logger.info("Parsing Document file")
+            content = parse_word_file(logger, file_path)
+        elif file_extension in file_extensions["TextFiles"]:
+            logger.info("Parsing Text file")
+            content = parse_txt_files(logger, file_path)
+        elif file_extension in file_extensions["SpreadSheets"]:
+            logger.info("Parsing Spreadsheet file")
+            content = parse_excel_files(logger, file_path)
+        elif file_extension in file_extensions["CSVFiles"]:
+            logger.info("Parsing CSV file")
             content = parse_csv_files(logger, file_path)
-        elif file_extension in [".doc", ".docx", ".pdf", ".rtf", ".txt", ".xml"]:
-            logger.info(f"Parsing Documents with extension: {file_extension}")
-            content = f"{file_extension}_file"
-        elif file_extension in [".xls", ".xlsm", ".xlsx"]:
-            logger.info(f"Parsing Spreadsheets")
-            content = "SpreadSheets"
-        elif file_extension in [".ppt", ".pptx", ".ppsx"]:
-            logger.info(f"Parsing Presentations")
-            content = "PPTs"
-        elif file_extension in [".mp3", ".wav"]:
-            logger.info(f"Parsing Audios")
-            content = "Audios"
-        elif file_extension in [".mp4", ".webm"]:
-            logger.info(f"Parsing Videos")
-            content = "Videos"
         else:
+            logger.warning(f"Unsupported file type: {file_extension}")
             content = f"Unsupported file type: {file_extension}"
     except Exception as e:
         content = f"Error processing file {file_path}: {str(e)}"
@@ -82,7 +87,7 @@ def extract_contents_from_file(logger, file_path):
 
 def extract_filepaths_with_attachments(logger, download_dir):
     logger.info(f"Airflow - services/extractAttachments.py - extract_filepaths_with_attachments() - Extracting files with attachments")
-    folder_data = []
+    extracted_data = []
     # Walk through the base directory
     email_ids = os.listdir(download_dir)
 
@@ -114,12 +119,22 @@ def extract_filepaths_with_attachments(logger, download_dir):
                         logger.info(f"Airflow - services/extractAttachments.py - extract_filepaths_with_attachments() - Processing file: {file_path}")
                         content = extract_contents_from_file(logger, file_path)
                         logger.info(f"Extracted contents from {file} is {content}")
+
+                        extracted_data.append({
+                            "email_id": email_id,
+                            "email": email,
+                            "file_type": file_type,
+                            "file": file,
+                            "content": content
+                        })
                 else:
                     continue
             else:
                 continue
+    return extracted_data
 
 def extract_contents_from_attachments(logger):
     logger.info(f"Airflow - services/extractAttachments.py - extract_contents_from_attachments() - Extracting contents from email attachments")
     download_dir = os.path.join(os.getcwd(), os.getenv("DOWNLOAD_DIRECTORY"))
-    extract_filepaths_with_attachments(logger, download_dir)
+    extracted_data = extract_filepaths_with_attachments(logger, download_dir)
+    save_emails_to_json_file(logger, extracted_data, "extracted_contents.json")

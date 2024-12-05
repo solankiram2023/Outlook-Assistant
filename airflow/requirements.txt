@@ -10,3 +10,7 @@ unidecode
 langchain-openai
 langchain-community
 openai
+python-docx
+mammoth
+openpyxl
+pymupdf

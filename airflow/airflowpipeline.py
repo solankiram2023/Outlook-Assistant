@@ -47,7 +47,10 @@ def main():
     process_emails_with_attachments(logger, access_token, s3_bucket_name)
     logger.info("Airflow - main() - Email attachments processed and uploaded to S3 successfully")
 
-    # extract_contents_from_attachments(logger)
+    # Extracting contents 
+    logger.info("Airflow - main() - extracting contents from email attachments")
+    extract_contents_from_attachments(logger)
+    logger.info("Airflow - main() - Contents from Email attachments extracted successfully")
 
 logger.info("Airflow - main() - Workflow completed")
 

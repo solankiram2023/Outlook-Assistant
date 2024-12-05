@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage
 
+from docx import Document
+import mammoth
+from openpyxl import load_workbook
+import fitz
+
 # Loading environment variables
 load_dotenv()
 
@@ -100,27 +105,60 @@ def parse_csv_files(logger, csv_file_path):
 
     return extracted_contents
 
-# Function to parse JSON files and extract contents
-def parse_json_files(logger, json_file_path):
-    def flatten_json(y, prefix=''):
-        out = {}
-        if isinstance(y, dict):
-            for k, v in y.items():
-                out.update(flatten_json(v, prefix + k + '_'))
-        elif isinstance(y, list):
-            for i, v in enumerate(y):
-                out.update(flatten_json(v, prefix + str(i) + '_'))
-        else:
-            out[prefix[:-1]] = y  # Remove the trailing underscore
-        return out
-
+# Parsing Word Document files
+def parse_word_file(logger, file_path):
     try:
-        with open(json_file_path, 'r') as f:
-            data = json.load(f)
-        flat_json = flatten_json(data)
-        # Concatenate all values as a single string
-        text_content = " ".join([str(value) for value in flat_json.values()])
-        return text_content
+        file_extension = os.path.splitext(file_path)[-1].lower()
+
+        if file_extension == ".docx":
+            # Use python-docx for .docx files
+            doc = Document(file_path)
+            content = "\n".join([para.text for para in doc.paragraphs])
+        elif file_extension == ".doc":
+            # Use mammoth for .doc files
+            with open(file_path, "rb") as doc_file:
+                result = mammoth.extract_raw_text(doc_file)
+                content = result.value  # Extracted text
+        else:
+            content = f"Unsupported file type: {file_extension}"
     except Exception as e:
-        print(f"Error processing JSON file {json_file_path}: {e}")
-        return None
+        content = f"Error parsing file {file_path}: {str(e)}"
+
+    return content
+
+# Parsing txt files
+def parse_txt_files(logger, file_path):
+    try:
+        with open(file_path, "r", encoding="utf-8") as txt_file:
+            content = txt_file.read()
+        return content
+    except Exception as e:
+        return f"Error parsing file {file_path}: {str(e)}"
+    
+
+# Parsing Spreadsheets
+def parse_excel_files(logger, file_path):
+    try:
+        workbook = load_workbook(file_path, data_only=True)
+        content = ""
+        for sheet_name in workbook.sheetnames:
+            sheet = workbook[sheet_name]
+            content += f"Sheet: {sheet_name}\n"
+            for row in sheet.iter_rows(values_only=True):
+                content += ", ".join([str(cell) if cell is not None else "" for cell in row]) + "\n"
+        return content.strip()
+    except Exception as e:
+        return f"Error parsing XLSX file {file_path}: {str(e)}"
+
+
+def parse_pdf_files(logger, file_path):
+    try:
+        pdf_document = fitz.open(file_path)
+        content = ""
+        for page_num in range(len(pdf_document)):
+            page = pdf_document[page_num]
+            content += page.get_text()
+        pdf_document.close()
+        return content.strip()
+    except Exception as e:
+        return f"Error parsing PDF file {file_path}: {str(e)}"

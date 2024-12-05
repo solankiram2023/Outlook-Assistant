@@ -91,14 +91,12 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
         return
 
     file_extensions = {
-        "JSON": [".json"],
-        "Image": [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"],
-        "CSV": [".csv"],
-        "Documents": [".doc", ".docx", ".pdf", ".rtf", ".txt", ".xml"],
-        "Spreadsheets": [".xls", ".xlsm", ".xlsx"],
-        "Presentations": [".ppt", ".pptx", ".ppsx"],
-        "Audio": [".mp3", ".wav"],
-        "Video": [".mp4", ".webm"],
+        "PDFs":  [".pdf"],
+        "Images":  [".png", ".jpg", ".jpeg"],
+        "Docs": [".doc", ".docx"],
+        "TextFiles": [".txt"],
+        "SpreadSheets": [".xls", ".xlsx"],
+        "CSVFiles": ['.csv'],
     }
     
     # Define base directory structure

@@ -3,7 +3,7 @@ import re
 import tiktoken
 from openai import OpenAI
 from dotenv import load_dotenv
-from logger import start_logger
+from services.logger import start_logger
 from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
 
 # Load env

@@ -16,16 +16,29 @@ def load_users_tokendata_to_db(logger, formatted_token_response):
         try:
             cursor = conn.cursor()
             insert_query = f"""
-                    INSERT INTO users (
+                INSERT INTO users (
                     id, tenant_id, name, email, token_type, 
                     access_token, refresh_token, id_token, scope, 
                     token_source, issued_at, expires_at, nonce
-                    ) VALUES (
-                        %(id)s, %(tenant_id)s, %(name)s, %(email)s, %(token_type)s,
-                        %(access_token)s, %(refresh_token)s, %(id_token)s, %(scope)s,
-                        %(token_source)s, %(iat)s, %(exp)s, %(nonce)s
-                    )
-
+                ) VALUES (
+                    %(id)s, %(tenant_id)s, %(name)s, %(email)s, %(token_type)s,
+                    %(access_token)s, %(refresh_token)s, %(id_token)s, %(scope)s,
+                    %(token_source)s, %(iat)s, %(exp)s, %(nonce)s
+                )
+                ON CONFLICT (id) 
+                DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    name = EXCLUDED.name,
+                    email = EXCLUDED.email,
+                    token_type = EXCLUDED.token_type,
+                    access_token = EXCLUDED.access_token,
+                    refresh_token = EXCLUDED.refresh_token,
+                    id_token = EXCLUDED.id_token,
+                    scope = EXCLUDED.scope,
+                    token_source = EXCLUDED.token_source,
+                    issued_at = EXCLUDED.issued_at,
+                    expires_at = EXCLUDED.expires_at,
+                    nonce = EXCLUDED.nonce
             """
             cursor.execute(insert_query, formatted_token_response)
             conn.commit()
@@ -66,6 +79,40 @@ def insert_email_data(logger, email_data):
                     %(reply_to)s, %(response_type)s, %(sent_datetime)s, %(start_datetime)s, %(start_datetime_timezone)s,
                     %(subject)s, %(type)s, %(web_link)s
                 )
+                ON CONFLICT (id)
+                DO UPDATE SET
+                    content_type = EXCLUDED.content_type,
+                    body = EXCLUDED.body,
+                    body_preview = EXCLUDED.body_preview,
+                    change_key = EXCLUDED.change_key,
+                    conversation_id = EXCLUDED.conversation_id,
+                    conversation_index = EXCLUDED.conversation_index,
+                    created_datetime = EXCLUDED.created_datetime,
+                    created_datetime_timezone = EXCLUDED.created_datetime_timezone,
+                    end_datetime = EXCLUDED.end_datetime,
+                    end_datetime_timezone = EXCLUDED.end_datetime_timezone,
+                    has_attachments = EXCLUDED.has_attachments,
+                    importance = EXCLUDED.importance,
+                    inference_classification = EXCLUDED.inference_classification,
+                    is_draft = EXCLUDED.is_draft,
+                    is_read = EXCLUDED.is_read,
+                    is_all_day = EXCLUDED.is_all_day,
+                    is_out_of_date = EXCLUDED.is_out_of_date,
+                    meeting_message_type = EXCLUDED.meeting_message_type,
+                    meeting_request_type = EXCLUDED.meeting_request_type,
+                    odata_etag = EXCLUDED.odata_etag,
+                    odata_value = EXCLUDED.odata_value,
+                    parent_folder_id = EXCLUDED.parent_folder_id,
+                    received_datetime = EXCLUDED.received_datetime,
+                    recurrence = EXCLUDED.recurrence,
+                    reply_to = EXCLUDED.reply_to,
+                    response_type = EXCLUDED.response_type,
+                    sent_datetime = EXCLUDED.sent_datetime,
+                    start_datetime = EXCLUDED.start_datetime,
+                    start_datetime_timezone = EXCLUDED.start_datetime_timezone,
+                    subject = EXCLUDED.subject,
+                    type = EXCLUDED.type,
+                    web_link = EXCLUDED.web_link
                 """
 
             cursor.execute(email_insert_query, email_data)
@@ -95,6 +142,11 @@ def insert_sender_data(logger, sender_data):
                     ) VALUES (
                         %(id)s, %(email_id)s, %(email_address)s, %(name)s
                     )
+                    ON CONFLICT (id) 
+                    DO UPDATE SET
+                        email_id = EXCLUDED.email_id,
+                        email_address = EXCLUDED.email_address,
+                        name = EXCLUDED.name
                 """
 
             cursor.execute(sender_insert_query, sender_data)
@@ -124,6 +176,12 @@ def insert_recipient_data(logger, recipients_data):
                     ) VALUES (
                         %(id)s, %(email_id)s, %(type)s, %(email_address)s, %(name)s
                     )
+                    ON CONFLICT (id) 
+                    DO UPDATE SET
+                        email_id = EXCLUDED.email_id,
+                        type = EXCLUDED.type,
+                        email_address = EXCLUDED.email_address,
+                        name = EXCLUDED.name
                 """
 
             for recipient in recipients_data:
@@ -154,6 +212,9 @@ def insert_flags_data(logger, flags_data):
                     ) VALUES (
                         %(email_id)s, %(flag_status)s
                     )
+                    ON CONFLICT (email_id) 
+                    DO UPDATE SET
+                        flag_status = EXCLUDED.flag_status
                 """
 
             cursor.execute(flags_insert_query, flags_data)
