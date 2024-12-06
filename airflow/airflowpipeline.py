@@ -1,5 +1,5 @@
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
 
 
 from services.logger import start_logger
@@ -17,10 +17,11 @@ logger = start_logger()
 
 def main():
     logger.info("Airflow - main() - Inside main function")
+    
     # Load environment variables
-    refresh_token = os.getenv("REFRESH_TOKEN")
-    endpoint = os.getenv("ENDPOINT")
-    s3_bucket_name = os.getenv("S3_BUCKET_NAME")
+    refresh_token   = os.getenv("REFRESH_TOKEN")
+    endpoint        = os.getenv("ENDPOINT")
+    s3_bucket_name  = os.getenv("S3_BUCKET_NAME")
 
     logger.info("Airflow - main() - Calling get_token_response() function")
     token_response = get_token_response(logger, endpoint, refresh_token)
@@ -29,9 +30,10 @@ def main():
     logger.info("Airflow - main() - Calling format_token_response() function")
     formatted_token_response = format_token_response(logger, token_response)
     logger.info(f"Airflow - main() - Formatted Token Reposnse = {formatted_token_response}")
-    access_token = formatted_token_response['access_token']
-    email_id = formatted_token_response['email']
-    user_id = formatted_token_response['id']
+    
+    user_id       = formatted_token_response['id']
+    email_id      = formatted_token_response['email']
+    access_token  = formatted_token_response['access_token']
 
     logger.info("Airflow - main() - Calling create_tables_in_db() function")
     create_tables_in_db(logger)
@@ -54,7 +56,7 @@ def main():
     extract_contents_from_attachments(logger)
     logger.info("Airflow - main() - Contents from Email attachments extracted successfully")
 
-logger.info("Airflow - main() - Workflow completed")
+    logger.info("Airflow - main() - Workflow completed")
 
 if __name__ == '__main__':
     main()
