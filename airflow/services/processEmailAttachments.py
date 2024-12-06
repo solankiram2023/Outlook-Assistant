@@ -24,18 +24,22 @@ def fetch_emails_with_attachments(logger):
 
     conn = create_connection_to_postgresql()
     if conn:
+        
         try:
             cursor = conn.cursor()
             cursor.execute(query)
             emails_with_attachments = cursor.fetchall()
             logger.info(f"Airflow - services/processEmailAttachments.py - fetch_emails_with_attachments() - All the emails with attachments fetched successfully")
             return emails_with_attachments
+        
         except Exception as e:
             logger.info(f"Airflow - services/processEmailAttachments.py - fetch_emails_with_attachments() - Error fetching emails with attachments: {e}")
             return []
+        
         finally:
             close_connection(conn, cursor)
             logger.info(f"Airflow - services/processEmailAttachments.py - fetch_emails_with_attachments() - Connection closed successfully")
+    
     else:
         logger.info(f"Airflow - services/processEmailAttachments.py - fetch_emails_with_attachments() - Failed to connect to the database. {e}")
         return []
@@ -43,20 +47,26 @@ def fetch_emails_with_attachments(logger):
 
 def insert_attachment_data(logger, attachment_id, email_id, file_name, content_type, size, s3_url):
     conn = create_connection_to_postgresql()
-    insert_query = """
-        INSERT INTO attachments (id, email_id, name, content_type, size, bucket_url)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """
-    cursor = conn.cursor()
-    try:
-        cursor.execute(insert_query, (attachment_id, email_id, file_name, content_type, size, s3_url))
-        conn.commit()
-        logger.info(f"Attachment {file_name} inserted into the database.")
-    except Exception as e:
-        logger.error(f"Failed to insert attachment {file_name} into database. Error: {e}")
-        conn.rollback()
-    finally:
-        close_connection(conn, cursor)
+
+    if conn:
+        insert_query = """
+            INSERT INTO attachments (id, email_id, name, content_type, size, bucket_url)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor = conn.cursor()
+        try:
+            cursor.execute(insert_query, (attachment_id, email_id, file_name, content_type, size, s3_url))
+            conn.commit()
+            logger.info(f"Attachment {file_name} inserted into the database.")
+        
+        except Exception as e:
+            logger.error(f"Failed to insert attachment {file_name} into database. Error: {e}")
+            conn.rollback()
+        finally:
+            close_connection(conn, cursor)
+    
+    else:
+        logger.info(f"Airflow - services/processEmailAttachments.py - fetch_emails_with_attachments() - Failed to connect to the database. {e}")
 
 def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, access_token):
     logger.info(f"Processing attachments for email ID: {email_id}")
@@ -86,12 +96,12 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
         return
 
     file_extensions = {
-        "PDFs":  [".pdf"],
-        "Images":  [".png", ".jpg", ".jpeg"],
-        "Docs": [".doc", ".docx"],
-        "TextFiles": [".txt"],
-        "SpreadSheets": [".xls", ".xlsx"],
-        "CSVFiles": ['.csv'],
+        "PDFs"          : [".pdf"],
+        "Images"        : [".png", ".jpg", ".jpeg"],
+        "Docs"          : [".doc", ".docx"],
+        "TextFiles"     : [".txt"],
+        "SpreadSheets"  : [".xls", ".xlsx"],
+        "CSVFiles"      : ['.csv'],
     }
     
     # Define base directory structure
@@ -109,10 +119,10 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
     # Upload attachments to S3 and insert data into the database
     for attachment in attachments:
         attachment_id = attachment.get("id")
-        file_name = attachment.get("name")
+        file_name     = attachment.get("name")
         content_bytes = attachment.get("contentBytes")
-        content_type = attachment.get("contentType")
-        size = attachment.get("size")  # Assuming size is in the attachment response
+        content_type  = attachment.get("contentType")
+        size          = attachment.get("size")  # Assuming size is in the attachment response
 
         if not file_name or not content_bytes:
             continue
@@ -126,6 +136,7 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
 
         local_file_path = os.path.join(os.getcwd(), f"tmp/{file_name}")  # Use /tmp or a preferred directory
         logger.info(f"Storing attachments contents into local file: {local_file_path}")
+        
         with open(local_file_path, "wb") as f:
             f.write(file_contents)
         logger.info(f"Files uploaded to  {local_file_path}")
@@ -169,5 +180,6 @@ def process_emails_with_attachments(logger, access_token, s3_bucket_name):
     for user_email, email_id, has_attachments in emails_with_attachments:
         if has_attachments:
             logger.info(f"Airflow - services/processEmailAttachments.py - process_emails_with_attachments() - Fetching mails with attachments for email - {user_email}, mail-id - {email_id}")
+            
             upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, access_token)
             download_attachments_from_s3(logger, user_email, email_id, s3_bucket_name)
