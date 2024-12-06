@@ -4,6 +4,7 @@ import json
 
 from database.connectDB import create_connection_to_postgresql, close_connection
 from services.vectors import create_embeddings_and_index
+from services.labeling import label_email
 
 # Function to store token response with respect to user in Users table
 def load_users_tokendata_to_db(logger, formatted_token_response):
@@ -11,6 +12,7 @@ def load_users_tokendata_to_db(logger, formatted_token_response):
     logger.info("Airflow - database/loadtoDB.py -  load_users_tokendata_to_db() - Creating database connection")
 
     conn = create_connection_to_postgresql()
+    user_email = None
 
     if conn:
         try:
@@ -42,13 +44,14 @@ def load_users_tokendata_to_db(logger, formatted_token_response):
             """
             cursor.execute(insert_query, formatted_token_response)
             conn.commit()
+            user_email = formatted_token_response['email']
             logger.info("Airflow - database/loadtoDB.py - load_users_tokendata_to_db() - Token data inserted successfully in USERS table")
 
         except Exception as e:
             logger.error(f"Airflow - database/loadtoDB.py - load_users_tokendata_to_db() - Error inserting token data into the users table = {e}")
-            raise e
         finally:
             close_connection(conn, cursor)
+            return user_email
 
 
 # Fuction to load email link data into EMAIL_LINKS table
@@ -81,7 +84,6 @@ def insert_or_update_email_links(logger, email_link_data):
 
         except Exception as e:
             logger.error(f"Airflow - database/loadtoDB.py - insert_or_update_email_links() - Error inserting or updating email links data: {e}")
-            raise e
         finally:
             close_connection(conn, cursor)
 
@@ -263,6 +265,38 @@ def insert_flags_data(logger, flags_data):
             close_connection(conn, cursor)
 
 
+# Function to save email categories
+def insert_category_data(logger, email_id, labels):
+    logger.info("Airflow - database/loadtoDB.py - insert_category_data() - Loading email categories into the database")
+
+    conn = create_connection_to_postgresql()
+
+    if conn:
+        categories_insert_query = """
+            INSERT INTO categories (
+                id, email_id, category
+            ) VALUES (
+                %s, %s, %s  
+            )
+        """
+        
+        try:
+            if not labels:
+                raise ValueError("Labels is empty!")
+
+            with conn.cursor() as cursor:
+                for label in labels:
+                    cursor.execute(categories_insert_query, (str(uuid.uuid4()), str(email_id), str(label),))
+                
+                conn.commit()
+                logger.info("Airflow - database/loadtoDB.py - insert_category_data() - Inserted email category into the database")
+
+        except Exception as e:
+            logger.error(f"Airflow - database/loadtoDB.py - insert_category_data() - Error inserting CATEGORY contents into the CATEGORY table = {e}")
+
+        finally:
+            close_connection(conn)
+
 # Function to load emails info
 def load_email_info_to_db(logger, formatted_mail_responses, user_email):
     logger.info("Airflow - database/loadtoDB.py - load_email_info_to_db() - Loading mail information into the database")
@@ -309,10 +343,10 @@ def load_email_info_to_db(logger, formatted_mail_responses, user_email):
         sender_info = email.get("sender", {}).get("emailAddress", {})
         sender_dict = ast.literal_eval(sender_info)
         sender_data = {
-            "id": str(uuid.uuid4()),
-            "email_id": email.get("id", ""),
-            "email_address": sender_dict.get("address", ""),
-            "name": sender_dict.get("name", "")
+            "id"            : str(uuid.uuid4()),
+            "email_id"      : email.get("id", ""),
+            "email_address" : sender_dict.get("address", ""),
+            "name"          : sender_dict.get("name", "")
         }
 
         # Recipient data
@@ -322,17 +356,17 @@ def load_email_info_to_db(logger, formatted_mail_responses, user_email):
                 recipient_info = recipient.get("emailAddress", "")
                 recipient_dict = ast.literal_eval(recipient_info)
                 recipients_data.append({
-                    "id": str(uuid.uuid4()),
-                    "email_id": email.get("id", ""),
-                    "type": recipient_type,
-                    "email_address": recipient_dict.get('address', ""),
-                    "name": recipient_dict.get('name', "")
+                    "id"            : str(uuid.uuid4()),
+                    "email_id"      : email.get("id", ""),
+                    "type"          : recipient_type,
+                    "email_address" : recipient_dict.get('address', ""),
+                    "name"          : recipient_dict.get('name', "")
                 })
 
         # Email flags data
         flag_data = {
-            "email_id": email.get("id", ""),
-            "flag_status": email.get("flag", {}).get("flagStatus","")
+            "email_id"      : email.get("id", ""),
+            "flag_status"   : email.get("flag", {}).get("flagStatus","")
         }
 
         # Insert email data into Postgres
@@ -366,11 +400,26 @@ def load_email_info_to_db(logger, formatted_mail_responses, user_email):
         }
 
         metadata = {
-            "id"                    : email_data["id"],
-            "user_email"            : user_email,
-            "conversation_id"       : email_data["conversation_id"],
-            "conversation_index"    : email_data["conversation_index"],
-            "message_type"          : "email"
+            "id"                 : email_data["id"],
+            "user_email"         : user_email,
+            "conversation_id"    : email_data["conversation_id"],
+            "conversation_index" : email_data["conversation_index"],
+            "message_type"       : "email"
         }
 
         create_embeddings_and_index(data_to_index=data_to_index, metadata=metadata)
+        
+        # Email Categorization
+        cat_data = {
+            "sender_email" : sender_data["email_address"],
+            "subject"      : email_data["subject"],
+            "body"         : email_data["body"],
+            "reply_to"     : email_data["reply_to"]
+        }
+
+        categories = label_email(email_dict=cat_data)
+
+        # Insert category data into Postgres        
+        logger.info(f"Airflow - database/loadtoDB.py - load_email_info_to_db() - Loading 'category' contents to CATEGORY table in database")
+        insert_category_data(logger, email_data["id"], categories)
+        logger.info(f"Airflow - database/loadtoDB.py - load_email_info_to_db() - 'category' contents uploaded to CATEGORY table in database")
