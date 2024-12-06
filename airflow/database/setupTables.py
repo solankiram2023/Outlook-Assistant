@@ -13,6 +13,8 @@ def create_tables_in_db(logger):
                 "drop_attachments_table"            : "DROP TABLE IF EXISTS attachments CASCADE;",
                 "drop_flags_table"                  : "DROP TABLE IF EXISTS flags CASCADE;",
                 "drop_categories_table"             : "DROP TABLE IF EXISTS categories CASCADE;",
+                "drop_email_links_table"            : "DROP TABLE IF EXISTS email_links CASCADE;",
+                "drop_queued_jobs_table"            : "DROP TABLE IF EXISTS queued_jobs CASCADE;",
             },
         "create_tables": {
                 "create_users_table": """
@@ -119,6 +121,18 @@ def create_tables_in_db(logger):
                         status VARCHAR(50)
                     );
                 """,
+                "create_email_links_table": """
+                    CREATE TABLE IF NOT EXISTS email_links (
+                        id VARCHAR(255) PRIMARY KEY,
+                        email VARCHAR(255) UNIQUE,
+                        current_link TEXT DEFAULT NULL,
+                        next_link TEXT DEFAULT NULL,
+                        is_current_link_processed BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """
+
             },
     }
 
@@ -135,9 +149,11 @@ def create_tables_in_db(logger):
                 try:
                     logger.info(f"Airflow - POSTGRESQL - database/setupTables.py - create_tables_in_db() - Executing drop query for table: {table_name}")
                     cursor.execute(drop_query)
+                    conn.commit()
                     logger.info(f"Airflow - POSTGRESQL - database/setupTables.py - create_tables_in_db() - Table '{table_name}' dropped successfully.")
                 except Exception as e:
                     logger.error(f"Airflow - POSTGRESQL - database/setupTables.py - create_tables_in_db() - Error dropping table '{table_name}': {e}")
+                    conn.rollback()
 
             # Execute create table queries
             logger.info("Airflow - POSTGRESQL - database/setupTables.py - create_tables_in_db() - Creating new tables")
@@ -145,9 +161,11 @@ def create_tables_in_db(logger):
                 try:
                     logger.info(f"Airflow - POSTGRESQL - database/setupTables.py - create_tables_in_db() - Executing create query for table: {table_name}")
                     cursor.execute(create_query)
+                    conn.commit()
                     logger.info(f"Airflow - POSTGRESQL - database/setupTables.py - create_tables_in_db() - Table '{table_name}' created successfully.")
                 except Exception as e:
                     logger.error(f"Airflow - POSTGRESQL - database/setupTables.py - create_tables_in_db() - Error creating table '{table_name}': {e}")
+                    conn.rollback()
             
             conn.commit()
             logger.info(f"Airflow - POSTGRESQL - database/setupTables.py - create_tables_in_db() - All tables dropped and created successfully")

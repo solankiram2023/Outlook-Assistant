@@ -2,7 +2,7 @@ import os
 import boto3
 import base64
 import requests
-
+import time
 from database.connectDB import create_connection_to_postgresql, close_connection
 from services.processEmails import save_emails_to_json_file
 from services.extractAttachments import download_attachments_from_s3
@@ -11,20 +11,15 @@ def fetch_emails_with_attachments(logger):
     logger.info(f"Airflow - services/processEmailAttachments.py - fetch_emails_with_attachments() - Fetching mails with attachments")
 
     query = """
-        SELECT 
+        SELECT DISTINCT 
             u.email AS user_email,
             e.id AS email_id,
             e.has_attachments
-        FROM 
-            emails e
-        JOIN 
-            senders s ON s.email_id = e.id
-        JOIN 
-            recipients r ON r.email_id = e.id
-        JOIN 
-            users u ON (u.email = s.email_address OR u.email = r.email_address)
-        WHERE 
-            e.has_attachments = TRUE;
+        FROM emails e
+        JOIN senders s ON s.email_id = e.id
+        JOIN recipients r ON r.email_id = e.id
+        JOIN users u ON (u.email = s.email_address OR u.email = r.email_address)
+        WHERE e.has_attachments = TRUE;
         """
 
     conn = create_connection_to_postgresql()
@@ -75,7 +70,7 @@ def upload_attachments_to_s3(logger, user_email, email_id, s3_bucket_name, acces
     response = requests.get(
         attachment_url,
         headers={"Authorization": f"Bearer {access_token}"},
-        timeout=30,
+        timeout=120,
     )
 
     if response.status_code != 200:

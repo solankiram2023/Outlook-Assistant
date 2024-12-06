@@ -5,36 +5,68 @@ import requests
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
-from database.loadtoDB import load_email_info_to_db
+from database.loadtoDB import load_email_info_to_db, insert_or_update_email_links
 
-
-# Function to fetch mails with access token
-def fetch_emails(logger, access_token):
+# Function to fetch all the emails
+def fetch_emails(logger, access_token,  email_id, user_id):
     logger.info("Airflow - services/processEmails.py - fetch_emails() - Fetching mails from Microsoft Graph API")
 
     fetch_emails_url = os.getenv("FETCH_EMAILS_ENDPOINT")
-
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Prefer": 'outlook.body-content-type="html"',
         "Content-Type": "application/json",
     }
 
+    all_emails = []  # List to store all emails
+    current_link = fetch_emails_url
+    next_link = None
+    is_current_link_processed = False
+    count = 0
+
     try:
-        # Send the GET request to fetch emails
-        logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Sending a GET request to fetch emails")
-        response = requests.get(fetch_emails_url, headers=headers, timeout=30)
-        response.raise_for_status()
+        while current_link:
+            logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Fetching emails from link: {current_link}")
+            response = requests.get(current_link, headers=headers, timeout=60)
+            response.raise_for_status()
 
-        logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Emails fetched successfully")
-        email_data = response.json()
+            email_data = response.json()
+            emails = email_data.get("value", [])
+            all_emails.extend(emails)  
 
-        # Save the fetched emails to a JSON file
-        save_emails_to_json_file(logger, email_data, "fetch_mails.json")
-        return email_data
-    
+            next_link = email_data.get("@odata.nextLink")
+            is_current_link_processed = True  # Mark the current link as processed
+            count = count + 1
+
+            email_link_data = {
+                "id": user_id,
+                "email": email_id,
+                "current_link": current_link,
+                "next_link": next_link,
+                "is_current_link_processed": is_current_link_processed
+            }
+
+            insert_or_update_email_links(logger, email_link_data)
+
+            logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Processed link: {current_link}")
+            logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Fetched {len(emails)} emails. Next link: {next_link}")
+
+            # If there is no next link, break the loop
+            if not next_link:
+                break
+            else:
+                current_link = next_link
+
+            if count == 2:
+                break
+
     except requests.exceptions.RequestException as e:
-        logger.error(f"Airflow - services/processEmails.py - fetch_emails() - Error while fetching emails : {e}")
+        logger.error(f"Airflow - services/processEmails.py - fetch_emails() - Error while fetching emails: {e}")
+    
+    logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Completed fetching all emails. Total emails: {len(all_emails)}")
+    return all_emails
+
+
 
 # Function to process email JSON contents and format them
 def decode_content(content):
@@ -58,16 +90,14 @@ def extract_text_and_links(html_content):
     # Extract the cleaned text
     return soup.get_text(separator='\n', strip=True)
 
-# Function to process the mail responses
-def process_email_response(logger, email_data):
+
+def process_email_response(logger, emails):
     logger.info(f"Airflow - services/processEmails.py - process_email_response() - Processing mail responses")
-    formatted_email_data = {
-        "@odata.context": email_data.get("@odata.context", ""),
-        "value": []
-    }
+
+    formatted_email_data = []
 
     logger.info(f"Airflow - services/processEmails.py - process_email_response() - Parsing through each mail")
-    for email in email_data.get("value", []):
+    for email in emails:
         formatted_email = {}
 
         for key, value in email.items():
@@ -100,10 +130,11 @@ def process_email_response(logger, email_data):
                 # Process other key-value pairs
                 formatted_email[key] = clean_text(decode_content(str(value)))
 
-        formatted_email_data["value"].append(formatted_email)
+        formatted_email_data.append(formatted_email)
 
     logger.info(f"Airflow - services/processEmails.py - process_email_response() - Data formatted successfully")
     return formatted_email_data
+
 
 # Function to save mails to JSON file
 def save_emails_to_json_file(logger, email_data, file_name):
@@ -116,11 +147,11 @@ def save_emails_to_json_file(logger, email_data, file_name):
         logger.error(f"Airflow - services/processEmails.py - save_emails_to_json_file() - Error saving email data to JSON file: {e}")
 
 
-def process_emails(logger, access_token, user_email):
+def process_emails(logger, access_token, user_email, email_id, user_id):
     logger.info(f"Airflow - services/processEmails.py - process_emails() - Processing emails")
 
     logger.info(f"Airflow - services/processEmails.py - process_emails() - Fetching emails with access token")
-    mail_responses = fetch_emails(logger, access_token)
+    mail_responses = fetch_emails(logger, access_token, email_id, user_id)
 
     logger.info(f"Airflow - services/processEmails.py - process_emails() - Processing mail responses to format contents of emails")
     formatted_mail_responses = process_email_response(logger, mail_responses)

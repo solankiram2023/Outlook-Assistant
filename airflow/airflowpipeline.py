@@ -30,6 +30,8 @@ def main():
     formatted_token_response = format_token_response(logger, token_response)
     logger.info(f"Airflow - main() - Formatted Token Reposnse = {formatted_token_response}")
     access_token = formatted_token_response['access_token']
+    email_id = formatted_token_response['email']
+    user_id = formatted_token_response['id']
 
     logger.info("Airflow - main() - Calling create_tables_in_db() function")
     create_tables_in_db(logger)
@@ -40,7 +42,7 @@ def main():
     logger.info(f"Airflow - main() - Formatted Token data with respect to user is loaded into USERS table")
 
     logger.info("Airflow - main() - Calling process_email_response() function")
-    process_emails(logger, access_token, user_email)
+    process_emails(logger, access_token, user_email, email_id, user_id)
 
     # Fetch emails with attachments
     logger.info("Airflow - main() - processing emails with attachments")

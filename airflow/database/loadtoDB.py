@@ -51,6 +51,41 @@ def load_users_tokendata_to_db(logger, formatted_token_response):
             close_connection(conn, cursor)
 
 
+# Fuction to load email link data into EMAIL_LINKS table
+def insert_or_update_email_links(logger, email_link_data):
+    logger.info("Airflow - database/loadtoDB.py - insert_or_update_email_links() - Inserting or updating email links data in EMAIL_LINKS table")
+    logger.info("Airflow - database/loadtoDB.py - insert_or_update_email_links() - Creating database connection")
+
+    conn = create_connection_to_postgresql()
+
+    if conn:
+        try:
+            cursor = conn.cursor()
+            email_links_query = f"""
+                INSERT INTO email_links (
+                    id, email, current_link, next_link, is_current_link_processed
+                ) VALUES (
+                    %(id)s, %(email)s, %(current_link)s, %(next_link)s, %(is_current_link_processed)s
+                )
+                ON CONFLICT (id) 
+                DO UPDATE SET
+                    current_link = EXCLUDED.current_link,
+                    next_link = EXCLUDED.next_link,
+                    is_current_link_processed = EXCLUDED.is_current_link_processed,
+                    updated_at = CURRENT_TIMESTAMP
+            """
+
+            cursor.execute(email_links_query, email_link_data)
+            conn.commit()
+            logger.info("Airflow - database/loadtoDB.py - insert_or_update_email_links() - Email links data inserted or updated successfully in EMAIL_LINKS table")
+
+        except Exception as e:
+            logger.error(f"Airflow - database/loadtoDB.py - insert_or_update_email_links() - Error inserting or updating email links data: {e}")
+            raise e
+        finally:
+            close_connection(conn, cursor)
+
+
 # Function to load email data into EMAILS table
 def insert_email_data(logger, email_data):
     logger.info("Airflow - database/loadtoDB.py - insert_email_data() - Loading email data into EMAILS table")
@@ -230,11 +265,9 @@ def insert_flags_data(logger, flags_data):
 
 # Function to load emails info
 def load_email_info_to_db(logger, formatted_mail_responses, user_email):
-
     logger.info("Airflow - database/loadtoDB.py - load_email_info_to_db() - Loading mail information into the database")
 
-    for email in formatted_mail_responses.get("value", []):
-
+    for email in formatted_mail_responses:
         # Email data
         email_data = {
             "id"                        : email.get("id"),
