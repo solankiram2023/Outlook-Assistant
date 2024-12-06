@@ -1,9 +1,11 @@
 import os
 import re
+import json
 import tiktoken
 from openai import OpenAI
 from dotenv import load_dotenv
 from services.logger import start_logger
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
 
 # Load env
@@ -59,6 +61,36 @@ def preprocess_text(text, max_tokens=7000):
     
     return text
 
+def openai_embeddings(content):
+    ''' Convert text to OpenAI embeddings '''
+    logger.info("Airflow - MILVUS - openai_embeddings() - Connecting to OpenAI...")
+
+    embeddings = None
+    client = None
+
+    try:
+        client = OpenAI(
+            api_key      = os.getenv("OPENAI_API_KEY"),
+            project      = os.getenv("PROJECT_ID"),
+            organization = os.getenv("ORGANIZATION_ID")
+        )
+
+        embeddings = client.embeddings.create(
+            input = [content], 
+            model = os.getenv("EMBEDDING_MODEL")
+        ).data[0].embedding
+    
+    except Exception as exception:
+        logger.error("Airflow - MILVUS - openai_embeddings() - Exception occurred when converting content to embeddings (See exception below)")
+        logger.error(f"Airflow - MILVUS - openai_embeddings() - {exception}")
+
+    finally:
+        
+        if client:
+            client.close()
+        
+        return embeddings
+
 def create_embeddings_and_index(data_to_index, metadata):
     ''' Create embeddings using OpenAI embeddings and index the vectors '''
 
@@ -79,7 +111,7 @@ def create_embeddings_and_index(data_to_index, metadata):
     try:
         # If the collection does not exist, create one
         if not conn.has_collection(collection_name):
-            logger.info(f"Airflow - MILVUS - create_embeddings_and_index() - Collection '{collection_name}' does not exist. Creating collection...")
+            logger.warning(f"Airflow - MILVUS - create_embeddings_and_index() - Collection '{collection_name}' does not exist. Creating collection...")
             
             fields = [
                 FieldSchema(
@@ -130,19 +162,7 @@ def create_embeddings_and_index(data_to_index, metadata):
     content = " ".join([str(value) for value in data_to_index.values()])
 
     try:
-        
-        logger.info(f"Airflow - MILVUS - create_embeddings_and_index() - Connecting to OpenAI...")
-        client = OpenAI(
-            api_key      = os.getenv("OPENAI_API_KEY"),
-            project      = os.getenv("PROJECT_ID"),
-            organization = os.getenv("ORGANIZATION_ID")
-        )
-
-        logger.info(f"Airflow - MILVUS - create_embeddings_and_index() - Generating OpenAI embeddings...")
-        embedding = client.embeddings.create(
-            input = [content], 
-            model = os.getenv("EMBEDDING_MODEL")
-        ).data[0].embedding
+        embedding = openai_embeddings(content=content)
 
         vectors = {
             "embedding" : embedding,
@@ -159,7 +179,115 @@ def create_embeddings_and_index(data_to_index, metadata):
     
     finally:
         conn.close()
-        client.close()
 
         # If needed in future
-        return is_indexed
+        return is_indexed 
+
+def embed_email_attachments(filename: str):
+    ''' Read the filename for the json file, and create embeddings for email attachments '''
+
+    logger.info("Airflow - MILVUS - embed_email_attachments() - Creating embeddings for email attachments...")
+    data = []
+
+    try:
+        logger.info(f"Airflow - MILVUS - embed_email_attachments() - Reading {filename}")
+
+        with open(file=filename, mode='r') as file:
+            data = json.load(file)
+
+        if len(data) == 0:
+            raise ValueError(f"Expected some data in {filename}, but found nothing. Skipping...")
+        
+        conn = connect_to_Milvus()
+        if not conn:
+            logger.error("Airflow - MILVUS - embed_email_attachments() - Cannot create embeddings because connection to Milvus failed")
+            raise ConnectionError()
+        
+        # LangChain
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size      = 1000,
+            chunk_overlap   = 100,
+            length_function = len
+        )
+
+        # Attachments Collection
+        fields = [
+            FieldSchema(
+                name        = "id", 
+                dtype       = DataType.INT64, 
+                is_primary  = True, 
+                auto_id     = True
+            ),
+            FieldSchema(
+                name    = "embedding", 
+                dtype   = DataType.FLOAT_VECTOR, 
+                dim     = 3072
+            ),
+            FieldSchema(
+                name    = "metadata", 
+                dtype   = DataType.JSON
+            )
+        ]
+        
+        logger.info(f"Airflow - MILVUS - embed_email_attachments() - Preparing content for embeddings...")
+        
+        for record in data:
+
+            user_id     = record["email_id"]
+            email_id    = record["email"]
+            file_type   = record["file_type"]
+            file_name   = record["file"]
+            content     = record["content"]
+            
+            collection_name = str(user_id) + "_attachments"
+            collection_name = collection_name.replace('@', os.getenv("__AT"))
+            collection_name = collection_name.replace('.', os.getenv("__PERIOD"))
+
+            if not conn.has_collection(collection_name=collection_name):
+                logger.warning(f"Airflow - MILVUS - embed_email_attachments() - Collection '{collection_name}' does not exist. Creating collection...")
+
+                schema = CollectionSchema(fields=fields, description=f"Collection for attachments {collection_name}")
+                conn.create_collection(collection_name=collection_name, schema=schema)
+
+                logger.info(f"Airflow - MILVUS - embed_email_attachments() - Collection '{collection_name}' created successfully.")
+
+                # Index the embeddings for faster retrieval
+                index_params = conn.prepare_index_params()
+                index_params.add_index(
+                    field_name  = "embedding",
+                    index_type  = "IVF_FLAT", 
+                    metric_type = "COSINE", 
+                    params      = {"nlist": 1024}
+                )
+
+                conn.create_index(collection_name=collection_name, index_params=index_params)
+                logger.info(f"Airflow - MILVUS - embed_email_attachments() - Added index to embeddings successfully.")
+
+            # Create chunks and embed them
+            chunks = text_splitter.split_text(content)
+
+            logger.info(f"Airflow - MILVUS - embed_email_attachments() - Creating embeddings for file {file_name}")
+
+            for idx, chunk in enumerate(chunks):
+                embedding = openai_embeddings(content=chunk)
+
+                if embedding:
+                    metadata = {
+                        "user_id"     : user_id,
+                        "email_id"    : email_id,
+                        "file_type"   : file_type,
+                        "file_name"   : file_name,
+                        "chunk_index" : idx
+                    }
+
+                    vectors = {
+                        "embedding" : embedding,
+                        "metadata"  : metadata
+                    }
+
+                    conn.insert(collection_name=collection_name, data=vectors, timeout=None)
+                    logger.info(f"Airflow - MILVUS - embed_email_attachments() - Saved attachment vectors with metadata to {collection_name} successfully.")
+    
+    except Exception as exception:
+        logger.error("Airflow - MILVUS - embed_email_attachments() - Exception occurred when embedding email attachments (See exception below)")
+        logger.error(f"Airflow - MILVUS - embed_email_attachments() - {exception}")
