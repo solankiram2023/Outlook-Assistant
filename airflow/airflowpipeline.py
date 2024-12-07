@@ -36,7 +36,28 @@ def main():
     access_token  = formatted_token_response['access_token']
 
     logger.info("Airflow - main() - Calling create_tables_in_db() function")
-    create_tables_in_db(logger)
+
+    if os.getenv("IS_DB_SETUP") == "False":
+
+        create_tables_in_db(logger)
+
+        # Update the IS_DB_SETUP value in env file
+        env_file_path = ".env"
+        key = "IS_DB_SETUP"
+        new_value = "True"  # New value for the key
+
+        # Read the file content
+        with open(env_file_path, "r") as file:
+            lines = file.readlines()
+
+        # Write the updated content back to the file
+        with open(env_file_path, "w") as file:
+            for line in lines:
+                if line.startswith(f"{key}="):
+                    file.write(f"{key}={new_value}\n")
+                else:
+                    file.write(line)
+
     logger.info(f"Airflow - main() - Tables created successfully")
 
     logger.info("Airflow - main() - Calling load_users_tokendata_to_db() function")

@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from unidecode import unidecode
 
 from database.loadtoDB import load_email_info_to_db, insert_or_update_email_links
+from database.connectDB import create_connection_to_postgresql, close_connection
 
 # Function to fetch all the emails
 def fetch_emails(logger, access_token,  email_id, user_id):
@@ -18,8 +19,29 @@ def fetch_emails(logger, access_token,  email_id, user_id):
         "Content-Type": "application/json",
     }
 
+    curr_link_query = """
+                    SELECT next_link 
+                    FROM email_links 
+                    WHERE id = %s AND email = %s
+                    LIMIT 1
+                    """
+    
+    conn = create_connection_to_postgresql()
+    cursor = conn.cursor()
+    cursor.execute(curr_link_query, (user_id, email_id))
+
+    curr_link = cursor.fetchone()
+    logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Current link from DB - {curr_link}")
+    if curr_link is None:
+        current_link = fetch_emails_url
+        logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Fetch emails URL - {current_link}")
+    else:
+        current_link = curr_link[0]
+        logger.info(f"Airflow - services/processEmails.py - fetch_emails() - Fetch emails URL - {current_link}")
+
+    close_connection(conn, cursor)
+
     all_emails = []  # List to store all emails
-    current_link = fetch_emails_url
     next_link = None
     is_current_link_processed = False
     count = 0
