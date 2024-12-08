@@ -1,11 +1,13 @@
 [data-testid="column"]:nth-of-type(1) [data-testid="stVerticalBlock"] {
     height: calc(100vh - 100px);
     overflow-y: auto;
+    flex: 2;
 }
 
 [data-testid="column"]:nth-of-type(2) [data-testid="stVerticalBlock"] {
     height: calc(100vh - 100px);
     overflow-y: hidden;
+    flex: 1;
 }
 
 .email-list-item {
@@ -133,17 +135,22 @@
 .attachment-button {
     display: inline-flex;
     align-items: center;
-    padding: 0.375rem 0.75rem;
+    justify-content: center; /* Centers the text inside the button */
+    padding: 0.5rem 1rem; /* Adjust padding to provide adequate spacing */
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
     border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.2s ease;
+    min-width: 75px; /* Ensures the button is wide enough to fit the text */
+    white-space: nowrap; /* Prevents text wrapping inside the button */
+    text-align: center; /* Centers the text */
 }
 
 .attachment-button:hover {
     background-color: #e9ecef;
 }
+
 
 .attachment-preview {
     margin-top: 1rem;
