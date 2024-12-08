@@ -2,7 +2,15 @@ from utils.logs import start_logger
 from utils.variables import load_env_vars
 from fastapi import APIRouter, Request, status
 from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi import status, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from auth.authenticate import request_auth_token, request_access_tokens, refresh_access_tokens
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from utils.fetchmails import fetch_emails 
+from utils.fetchmails import load_email
+import utils
+
 
 # Start the router
 router  = APIRouter()
@@ -14,14 +22,14 @@ logger = start_logger()
 env = load_env_vars()
 
 @router.get(
-    path        = env["SIGN_IN_ENDPOINT"],
+    path        = env['SIGN_IN_ENDPOINT'],
     name        = "Sign-In",
     description = "Route to sign in the user to their Outlook account",
     tags        = ["Auth"]
 )
 def signin():
 
-    logger.info(f"ROUTES/AUTH - signin() - GET {env["SIGN_IN_ENDPOINT"]} Request to sign in to Microsoft account received")
+    logger.info(f"ROUTES/AUTH - signin() - GET {env['SIGN_IN_ENDPOINT']} Request to sign in to Microsoft account received")
     auth_url = request_auth_token()
     
     logger.info(f"ROUTES/AUTH - signin() - Redirecting to {auth_url}")
@@ -120,4 +128,43 @@ def renew_access_tokens(request: Request):
             "type"      : "string",
             "message"   : "New access tokens could not be fetched"
         }
+    )
+@router.get(
+    path="/fetch_emails",
+    name="Fetch Emails",
+    description="Endpoint to fetch emails with sender email, body preview, and subject",
+    tags=["Emails"]
+)
+def fetch_emails_endpoint(request: Request):
+    """
+    Endpoint to fetch email data from the database.
+    """
+    logger.info("ROUTES/EMAILS - fetch_emails_endpoint() - GET /fetch_emails Request to fetch email data received")
+
+    response = fetch_emails()  
+
+    # Return the dictionary as a JSONResponse
+    return JSONResponse(
+        status_code=response["status"],
+        content=response
+    )
+
+@router.get(
+    path="/load_email/{email_id}",
+    name="Load Email",
+    description="Endpoint to load email details by email ID",
+    tags=["Emails"]
+)
+def load_email_endpoint(email_id: str):
+    """
+    Endpoint to load email details by email ID.
+    """
+    logger.info(f"ROUTES/EMAILS - load_email_endpoint() - GET /load_email/{email_id} Request to load email details")
+
+    response = load_email(email_id)  # Call the load_email function
+
+    # Return the dictionary as a JSONResponse
+    return JSONResponse(
+        status_code=response["status"],
+        content=response
     )
