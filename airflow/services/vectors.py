@@ -128,6 +128,11 @@ def create_embeddings_and_index(data_to_index, metadata):
                 FieldSchema(
                     name    = "metadata", 
                     dtype   = DataType.JSON
+                ),
+                FieldSchema(
+                    name       = "page_content",
+                    dtype      = DataType.VARCHAR,
+                    max_length = 7000 
                 )
             ]
             schema = CollectionSchema(fields=fields, description=f"Collection for user {collection_name}")
@@ -165,8 +170,9 @@ def create_embeddings_and_index(data_to_index, metadata):
         embedding = openai_embeddings(content=content)
 
         vectors = {
-            "embedding" : embedding,
-            "metadata"  : metadata
+            "embedding"     : embedding,
+            "metadata"      : metadata,
+            "page_content"  : content
         }
 
         conn.insert(collection_name=collection_name, data=vectors)
@@ -226,6 +232,11 @@ def embed_email_attachments(filename: str):
             FieldSchema(
                 name    = "metadata", 
                 dtype   = DataType.JSON
+            ),
+            FieldSchema(
+                name       = "page_content",
+                dtype      = DataType.VARCHAR,
+                max_length = 7000 
             )
         ]
         
@@ -281,8 +292,9 @@ def embed_email_attachments(filename: str):
                     }
 
                     vectors = {
-                        "embedding" : embedding,
-                        "metadata"  : metadata
+                        "embedding"     : embedding,
+                        "metadata"      : metadata,
+                        "page_content"  : chunk
                     }
 
                     conn.insert(collection_name=collection_name, data=vectors, timeout=None)
