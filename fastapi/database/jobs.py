@@ -1,3 +1,4 @@
+import jwt
 import json
 import requests
 from fastapi import status
@@ -131,6 +132,14 @@ def fetch_user_via_job(job_id: int):
 
                     # Create a dictionary from columns and values
                     auth_dict = dict(zip(column_names, result))
+
+                    # Decode the id_token
+                    decoded_token = jwt.decode(
+                        jwt     = auth_dict["id_token"], 
+                        options = {"verify_signature": False}
+                    )
+                    auth_dict['id_token_claims'] = decoded_token
+
                     result = auth_dict
 
                     logger.info(f"DATABASE/JOBS - fetch_job() - Fetched user data via job_id")
