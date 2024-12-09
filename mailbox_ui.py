@@ -5,6 +5,13 @@ from streamlit_quill import st_quill
 from components import get_initials, get_category
 from email_service import EmailService
 import logging
+import tiktoken
+from streamlit_elements import elements, dashboard, mui, html
+from audio_recorder import record_and_transcribe
+import os
+from speech_utils import text_to_speech
+
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -117,11 +124,29 @@ col1, col2 = st.columns([1, 2])
 with col1:
     st.markdown("### Inbox")
     
+    # Add audio recorder with transcription
+    st.write("Search by voice:")
+    if 'transcribed_text' not in st.session_state:
+        st.session_state.transcribed_text = ""
+    
+    col_record, col_clear = st.columns([5,1])
+    
+    with col_record:
+        transcribed_text = record_and_transcribe()
+        if transcribed_text:
+            st.session_state.transcribed_text = transcribed_text
+    
+    with col_clear:
+        if st.button("Clear"):
+            st.session_state.transcribed_text = ""
+    
+    # Search input that uses transcribed text
     search_query = st.text_input(
         label="Search",
         label_visibility="hidden",
         key="search",
-        placeholder="Search mail..."
+        placeholder="Search mail...",
+        value=st.session_state.transcribed_text
     )
     
     email_list_container = st.container()
@@ -183,12 +208,38 @@ with col2:
         )
         
         if selected_email:
-            header_col1, header_col2 = st.columns([10, 1])
+            header_col1, header_col2, header_col3 = st.columns([8, 2, 1])
             
             with header_col1:
                 st.markdown(f"### {selected_email['subject']}")
             
             with header_col2:
+                # Add voice selection and Read Email button
+                voice_options = {
+                    "Alloy": "alloy",
+                    "Echo": "echo",
+                    "Fable": "fable"
+                }
+                selected_voice = st.selectbox(
+                    "Voice",
+                    options=list(voice_options.keys()),
+                    label_visibility="collapsed"
+                )
+                if st.button("🔊 Read Email"):
+                    # Prepare text to be read
+                    email_text = f"Email from {selected_email['sender']}. Subject: {selected_email['subject']}. Content: {selected_email['content']}"
+                    
+                    with st.spinner("Generating audio..."):
+                        audio_file = text_to_speech(email_text, voice=voice_options[selected_voice])
+                        if audio_file:
+                            # Display audio player
+                            with open(audio_file, 'rb') as f:
+                                audio_bytes = f.read()
+                            st.audio(audio_bytes, format='audio/mp3')
+                            # Clean up temporary file
+                            os.remove(audio_file)
+            
+            with header_col3:
                 menu_container = st.container()
                 
                 with menu_container:

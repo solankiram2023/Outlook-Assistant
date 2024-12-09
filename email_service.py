@@ -1,8 +1,9 @@
-# email_service.py
 import requests
 import logging
+import boto3
 from typing import Dict, Any
 from datetime import datetime
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
@@ -10,8 +11,9 @@ class EmailService:
     def __init__(self, base_url: str = 'http://127.0.0.1:5000'):
         """Initialize EmailService with optional base URL."""
         self.base_url = base_url
+        self.s3_client = boto3.client('s3')
         logger.info(f"EmailService initialized with base URL: {self.base_url}")
-        
+    
     def fetch_emails(self) -> Dict[str, Any]:
         """Fetch all emails from the API."""
         try:
@@ -29,38 +31,6 @@ class EmailService:
                 "data": []
             }
 
-    def load_email(self, email_id: str) -> Dict[str, Any]:
-        """Load specific email details."""
-        try:
-            logger.info(f"Loading email details for ID: {email_id}")
-            response = requests.get(f"{self.base_url}/load_email/{email_id}")
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as e:
-            logger.error(f"Error loading email {email_id}: {str(e)}")
-            return {
-                "status": 500,
-                "message": f"Failed to load email {email_id}",
-                "data": None
-            }
-
-# email_service.py
-import requests
-import logging
-import boto3
-from typing import Dict, Any
-from datetime import datetime
-from botocore.exceptions import ClientError
-
-logger = logging.getLogger(__name__)
-
-class EmailService:
-    def __init__(self, base_url: str = 'http://127.0.0.1:5000'):
-        """Initialize EmailService with optional base URL."""
-        self.base_url = base_url
-        self.s3_client = boto3.client('s3')
-        logger.info(f"EmailService initialized with base URL: {self.base_url}")
-    
     def get_s3_download_url(self, bucket_name: str, s3_key: str) -> str:
         """Generate a presigned URL for downloading the attachment."""
         try:
@@ -136,4 +106,4 @@ class EmailService:
                 "status": 500,
                 "message": f"Failed to load email {email_id}",
                 "data": None
-            }        
+            }
