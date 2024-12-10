@@ -14,3 +14,4 @@ python-docx
 mammoth
 openpyxl
 pymupdf
+tiktoken
