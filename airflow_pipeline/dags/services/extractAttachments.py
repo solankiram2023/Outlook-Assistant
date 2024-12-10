@@ -159,6 +159,12 @@ def extract_contents_from_attachments(logger):
     logger.info(f"Airflow - services/extractAttachments.py - extract_contents_from_attachments() - Extracting contents from email attachments")
     
     download_dir = os.path.join(os.getcwd(), os.getenv("DOWNLOAD_DIRECTORY"))
+    
+    # If no attachments were found, the DOWNLOAD_DIRECTORY won't exist
+    if not os.path.isdir(download_dir):
+        logger.warning(f"Airflow - services/extractAttachments.py - extract_contents_from_attachments() - No attachments were found so far")
+        return
+
     extracted_data = extract_filepaths_with_attachments(logger, download_dir)
     
     save_emails_to_json_file(logger, extracted_data, "extracted_contents.json")
