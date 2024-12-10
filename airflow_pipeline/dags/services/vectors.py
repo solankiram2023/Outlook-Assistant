@@ -145,9 +145,9 @@ def create_embeddings_and_index(data_to_index, metadata):
                     dtype   = DataType.JSON
                 ),
                 FieldSchema(
-                name       = "page_content",
-                dtype      = DataType.VARCHAR,
-                max_length = 7000 
+                    name       = "page_content",
+                    dtype      = DataType.VARCHAR,
+                    max_length = 60000 
                 )
             ]
             schema = CollectionSchema(fields=fields, description=f"Collection for user {collection_name}")
@@ -179,7 +179,7 @@ def create_embeddings_and_index(data_to_index, metadata):
     data_to_index["body"] = preprocess_text(text=data_to_index["body"], max_tokens=7000)
 
     # Content to index
-    content = " ".join([str(value) for value in data_to_index.values()])
+    content = "; ".join([f"{str(key).upper()}: {value}" for key, value in data_to_index.items()])
 
     try:
         embedding = openai_embeddings(content=content)
@@ -251,7 +251,7 @@ def embed_email_attachments(filename: str):
             FieldSchema(
                 name       = "page_content",
                 dtype      = DataType.VARCHAR,
-                max_length = 7000 
+                max_length = 60000 
             )
         ]
         
