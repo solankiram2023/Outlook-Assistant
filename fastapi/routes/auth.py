@@ -87,10 +87,14 @@ def renew_access_tokens(request: Request):
 
     query_params = request.query_params
     refresh_token = query_params.get('refreshToken', None)
+    requested_by = query_params.get('requestedBy', None)
+
+    if requested_by and (len(str(requested_by).strip()) > 0):
+        logger.info(f"ROUTES/AUTH - renew_access_tokens() - Request originated from {requested_by}")
 
     if not refresh_token:
-
         logger.info(f"ROUTES/AUTH - renew_access_tokens() - Refresh token is missing from query parameters")
+        
         return JSONResponse(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             content     = {
@@ -116,14 +120,34 @@ def renew_access_tokens(request: Request):
         )
 
     logger.info(f"ROUTES/AUTH - renew_access_tokens() - Failed to fetch new access tokens")
-    return JSONResponse(
-        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content     = {
-            "status"    : status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "type"      : "string",
-            "message"   : "New access tokens could not be fetched"
-        }
-    )
+
+    # If the refresh token has expired, the user has no option other than to 
+    # sign-in into their Microsoft account again. Unfortunately, airflow does 
+    # not have the provision to open the browser and ask the user to sign-in 
+    # into their Microsoft account. 
+
+    # If the request originated from Airflow, and the refresh token was expired/invalid, 
+    # return a json-based error response
+
+    if requested_by and (len(str(requested_by)) > 0 and str(requested_by).lower() == 'airflow'):
+        logger.info(f"ROUTES/AUTH - renew_access_tokens() - Returning failure response to {requested_by}")
+
+        return JSONResponse(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content     = {
+                "status"    : status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "type"      : "string",
+                "message"   : "New access tokens could not be fetched"
+            }
+        )
+
+    # Until Streamlit is done, redirect to sign-in page via FastAPI to fetch new tokens
+    redirect_url = "http://" + env["HOSTNAME"] + ":" + env["HOST_PORT"] + env["SIGN_IN_ENDPOINT"]
+
+    logger.info(f"ROUTES/AUTH - renew_access_tokens() - Redirecting to {redirect_url}")
+    return RedirectResponse(redirect_url)
+
+
 @router.get(
     path        = env["FETCH_MAILS_ENDPOINT"],
     name        = "Fetch Emails",
