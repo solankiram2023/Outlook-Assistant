@@ -340,8 +340,21 @@ def load_email_info_to_db(logger, formatted_mail_responses, user_email):
         }
 
         # Sender data
-        sender_info = email.get("sender", {}).get("emailAddress", {})
-        sender_dict = ast.literal_eval(sender_info)
+        sender_info = email.get("sender", {}).get("emailAddress", None)
+
+        # Sometimes, the emailAddress of the sender might be missing
+        # Like for Calendar reminders, the sender address is empty
+        if sender_info:
+            try:
+                sender_dict = ast.literal_eval(sender_info)
+            
+            except Exception as exception:
+                logger.warning("Airflow - database/loadtoDB.py - load_email_info_to_db() - Sender email address seems to be missing. Defaulting to empty string.")
+                sender_dict = {}
+       
+        else:
+            sender_dict = {}
+        
         sender_data = {
             "id"            : str(uuid.uuid4()),
             "email_id"      : email.get("id", ""),
@@ -393,6 +406,8 @@ def load_email_info_to_db(logger, formatted_mail_responses, user_email):
         data_to_index = {
             "subject"           : email_data["subject"],
             "body"              : email_data["body"],
+            "sender_name"       : sender_data["name"],
+            "sender_email"      : sender_data["email_address"],
             "reply_to"          : email_data["reply_to"],
             "created_datetime"  : email_data["created_datetime"],
             "received_datetime" : email_data["received_datetime"],
