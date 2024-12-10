@@ -23,31 +23,32 @@ def check_email_exists(email):
     # Email exists status
     exists = False
     
-    try:
-        with conn.cursor() as cursor:
-            # SQL query to check if the email exists
-            sql_query = """
-                SELECT email
-                FROM users
-                WHERE email = %s
-                LIMIT 1;
-            """
-            logger.info("DATABASE/AUTHSTORAGE - check_email_exists() - Executing SQL query to check if user exists...")
-            cursor.execute(sql_query, (email,))
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                # SQL query to check if the email exists
+                sql_query = """
+                    SELECT email
+                    FROM users
+                    WHERE email = %s
+                    LIMIT 1;
+                """
+                logger.info("DATABASE/AUTHSTORAGE - check_email_exists() - Executing SQL query to check if user exists...")
+                cursor.execute(sql_query, (email,))
 
-            # Check if the email exists
-            if cursor.fetchone():
-                logger.info(f"DATABASE/AUTHSTORAGE - check_email_exists() - Email {email} exists in the 'users' table")
-                exists = True
-            else:
-                logger.info(f"DATABASE/AUTHSTORAGE - check_email_exists() - Email {email} does not exist in the 'users' table")
+                # Check if the email exists
+                if cursor.fetchone():
+                    logger.info(f"DATABASE/AUTHSTORAGE - check_email_exists() - Email {email} exists in the 'users' table")
+                    exists = True
+                else:
+                    logger.info(f"DATABASE/AUTHSTORAGE - check_email_exists() - Email {email} does not exist in the 'users' table")
 
-    except Exception as exception:
-        logger.error(f"DATABASE/AUTHSTORAGE - check_email_exists() - Failed to check email existence (See exception below)")
-        logger.error(f"DATABASE/AUTHSTORAGE - check_email_exists() - {exception}")
+        except Exception as exception:
+            logger.error(f"DATABASE/AUTHSTORAGE - check_email_exists() - Failed to check email existence (See exception below)")
+            logger.error(f"DATABASE/AUTHSTORAGE - check_email_exists() - {exception}")
 
-    finally:
-        close_connection(conn=conn)
+        finally:
+            close_connection(conn=conn)
 
     return exists
 
@@ -79,21 +80,19 @@ def save_auth_response(auth_dict):
 
             # Prepare data for insertion or update
             user_data = {
-                "id"                 : id_token_claims.get("oid"),
-                "tenant_id"          : id_token_claims.get("tid"),
-                "name"               : id_token_claims.get("name"),
-                "email"              : email,
-                "token_type"         : auth_dict.get("token_type"),
-                "access_token"       : auth_dict.get("access_token"),
-                "refresh_token"      : auth_dict.get("refresh_token"),
-                "id_token"           : auth_dict.get("id_token"),
-                "scope"              : auth_dict.get("scope"),
-                "token_source"       : auth_dict.get("token_source"),
-                "issued_at"          : id_token_claims.get("iat"),
-                "expires_at"         : id_token_claims.get("exp"),
-                "preferred_username" : id_token_claims.get("preferred_username"),
-                "nonce"              : id_token_claims.get("nonce", "random_value"),
-                "is_active"          : True
+                "id"            : id_token_claims.get("oid"),
+                "tenant_id"     : id_token_claims.get("tid"),
+                "name"          : id_token_claims.get("name"),
+                "email"         : email,
+                "token_type"    : auth_dict.get("token_type"),
+                "access_token"  : auth_dict.get("access_token"),
+                "refresh_token" : auth_dict.get("refresh_token"),
+                "id_token"      : auth_dict.get("id_token"),
+                "scope"         : auth_dict.get("scope"),
+                "token_source"  : auth_dict.get("token_source"),
+                "issued_at"     : id_token_claims.get("iat"),
+                "expires_at"    : id_token_claims.get("exp"),
+                "nonce"         : id_token_claims.get("nonce", "random_value")
             }
 
             # Before inserting, check if the user is signin up for the first time
@@ -110,11 +109,11 @@ def save_auth_response(auth_dict):
                 # Insert or update into the 'users' table
                 sql = """
                 INSERT INTO users (id, tenant_id, name, email, token_type, access_token, refresh_token, id_token, 
-                                scope, token_source, issued_at, expires_at, preferred_username, nonce, is_active)
+                                scope, token_source, issued_at, expires_at, nonce)
                 VALUES (%(id)s, %(tenant_id)s, %(name)s, %(email)s, %(token_type)s, %(access_token)s, 
                         %(refresh_token)s, %(id_token)s, %(scope)s, %(token_source)s, 
                         to_timestamp(%(issued_at)s), to_timestamp(%(expires_at)s), 
-                        %(preferred_username)s, %(nonce)s, %(is_active)s)
+                        %(nonce)s)
                 ON CONFLICT (email)
                 DO UPDATE SET
                     id = EXCLUDED.id,
@@ -128,9 +127,7 @@ def save_auth_response(auth_dict):
                     token_source = EXCLUDED.token_source,
                     issued_at = EXCLUDED.issued_at,
                     expires_at = EXCLUDED.expires_at,
-                    preferred_username = EXCLUDED.preferred_username,
-                    nonce = EXCLUDED.nonce,
-                    is_active = EXCLUDED.is_active;
+                    nonce = EXCLUDED.nonce
                 """
 
                 logger.info("DATABASE/AUTHSTORAGE - save_auth_response() - Executing SQL query to save data...")
