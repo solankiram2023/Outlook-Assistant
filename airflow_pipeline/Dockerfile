@@ -1,17 +1,11 @@
 # Use the base image from Apache Airflow
 FROM apache/airflow:2.10.2
 
-# Switch to the airflow user (default in the base image)
-USER airflow
+# Switch to root user to install additional software
+USER root
 
-# Copy requirements.txt into the container
-COPY requirements.txt /requirements.txt
+# Update package repositories
+RUN apt-get update
 
-# # Copy the .env file into the container
-COPY .env /opt/airflow/dags/.env
-
-# Install Python dependencies as the airflow user
-RUN pip install --no-cache-dir -r /requirements.txt
-
-# Switch back to the airflow user explicitly
+# Switch back to the airflow user
 USER airflow
