@@ -91,6 +91,7 @@ def fetch_tokens(token_type: str, request_url: str, request_data: dict, request_
             logger.warning("AUTH/AUTHENTICATE - fetch_tokens() - POST request failed")
 
             auth_dict = None
+            response = response.json()
             error_description = response.get("error_description", "Unknown error")
             logger.error("AUTH/AUTHENTICATE - fetch_tokens() - Error occurred while fetching access tokens (See details below)")
             logger.error(f"AUTH/AUTHENTICATE - fetch_tokens() - {error_description}")
