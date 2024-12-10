@@ -203,11 +203,11 @@ def is_token_valid(auth_dict: dict):
             current_time = datetime.now()
             
             if current_time < expires_at:
-                logger.info(f"AUTH/AUTHENTICATE - is_token_valid() - Token for user {str(auth_dict["email"])} is still valid")
+                logger.info(f"AUTH/AUTHENTICATE - is_token_valid() - Token for user {str(auth_dict['email'])} is still valid")
                 is_valid = True
             
             else:
-                logger.warning(f"AUTH/AUTHENTICATE - is_token_valid() - Token for user {str(auth_dict["email"])} has expired")
+                logger.warning(f"AUTH/AUTHENTICATE - is_token_valid() - Token for user {str(auth_dict['email'])} has expired")
                 is_valid = False
 
     except Exception as exception:
