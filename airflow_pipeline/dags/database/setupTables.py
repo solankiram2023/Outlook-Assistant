@@ -118,7 +118,8 @@ def create_tables_in_db(logger):
                         id SERIAL PRIMARY KEY, 
                         email VARCHAR(255), 
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
-                        status VARCHAR(50)
+                        status VARCHAR(50),
+                        updated_at TIMESTAMP DEFAULT '1970-01-01 00:00:00'
                     );
                 """,
                 "create_email_links_table": """
