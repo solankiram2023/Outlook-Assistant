@@ -1,0 +1,7 @@
+streamlit
+openai
+python-dotenv
+SpeechRecognition
+pydub
+streamlit-quill
+audio-recorder-streamlit
