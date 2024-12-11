@@ -87,6 +87,38 @@ def insert_or_update_email_links(logger, email_link_data):
         finally:
             close_connection(conn, cursor)
 
+# Function to insert email folders
+def insert_email_folders(logger, email_folder):
+    logger.info("Airflow - database/loadtoDB.py - insert_email_folders() - Loading email folders into EMAIL_FOLDERS table")
+    logger.info("Airflow - database/loadtoDB.py - insert_email_folders() - Creating database connection")
+
+    conn = create_connection_to_postgresql()
+
+    if conn:
+        try:
+            cursor = conn.cursor()
+            emailfolder_insert_query = f"""
+                        INSERT INTO email_folders (
+                            id, display_name, parent_folder_id, child_folder_count, unread_item_count,
+                            total_item_count, size_in_bytes, is_hidden, created_at
+                        )
+                        VALUES (
+                            %(id)s, %(display_name)s, %(parent_folder_id)s, %(child_folder_count)s,
+                            %(unread_item_count)s, %(total_item_count)s, %(size_in_bytes)s,
+                            %(is_hidden)s, CURRENT_TIMESTAMP
+                        )
+                        ON CONFLICT (id) DO NOTHING;
+                    """
+            cursor.execute(emailfolder_insert_query, email_folder)
+            conn.commit()
+            logger.info("Airflow - database/loadtoDB.py - insert_email_folders() - Email folders inserted successfully in EMAIL_FOLDERS table")
+
+        except Exception as e:
+            logger.error(f"Airflow - database/loadtoDB.py - insert_email_folders() - Error inserting email contents into the EMAIL_FOLDERS table = {e}")
+            raise e
+        finally:
+            close_connection(conn, cursor)
+
 
 # Function to load email data into EMAILS table
 def insert_email_data(logger, email_data):
