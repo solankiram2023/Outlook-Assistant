@@ -438,3 +438,116 @@ def load_email_info_to_db(logger, formatted_mail_responses, user_email):
         logger.info(f"Airflow - database/loadtoDB.py - load_email_info_to_db() - Loading 'category' contents to CATEGORY table in database")
         insert_category_data(logger, email_data["id"], categories)
         logger.info(f"Airflow - database/loadtoDB.py - load_email_info_to_db() - 'category' contents uploaded to CATEGORY table in database")
+
+
+
+def fetch_new_job(logger):
+    logger.info("Airflow - database/loadtoDB.py - fetch_new_job() - Fetching job that has not been processed lately")
+
+    conn = create_connection_to_postgresql()
+    refresh_token = None
+
+    if not conn:
+        logger.info("Airflow - database/loadtoDB.py - fetch_new_job() - Failed to connect to database")
+        
+        return refresh_token
+        
+    # If there are pending jobs in the table
+    fetching_pending_jobs_query = """
+        SELECT refresh_token 
+        FROM users 
+        WHERE email IN (
+            SELECT email 
+            FROM queued_jobs 
+            WHERE status = 'pending' 
+            ORDER BY updated_at ASC 
+            LIMIT 1
+        );
+    """
+
+    # If there are no pending jobs in the table, then fetch the job marked
+    # 'success' that was not updated in a while
+    fetching_fresh_jobs_query = """
+        SELECT refresh_token 
+        FROM users 
+        WHERE email IN (
+            SELECT email 
+            FROM queued_jobs 
+            WHERE status = 'success' 
+            ORDER BY updated_at ASC 
+            LIMIT 1
+        );
+    """
+
+    try:
+        with conn.cursor() as cursor:
+            logger.info("Airflow - database/loadtoDB.py - fetch_new_job() - Attempting to fetch job that is marked as pending")
+            
+            cursor.execute(fetching_pending_jobs_query)
+            result = cursor.fetchone()
+            
+            if result:
+                refresh_token = result[0]
+                logger.info("Airflow - database/loadtoDB.py - fetch_new_job() - Found a job marked as pending")
+            
+            else:
+                logger.info("Airflow - database/loadtoDB.py - fetch_new_job() - Found no jobs marked as pending")
+                logger.info("Airflow - database/loadtoDB.py - fetch_new_job() - Attempting to fetch job that was not updated recently")
+                
+                cursor.execute(fetching_fresh_jobs_query)
+                result = cursor.fetchone()
+                
+                if result:
+                    refresh_token = result[0]
+                    logger.info("Airflow - database/loadtoDB.py - fetch_new_job() - Found a job that was not updated recently")
+                
+                else:
+                    logger.warning("Airflow - database/loadtoDB.py - fetch_new_job() - No pending or fresh jobs found")
+                    refresh_token = None
+    
+    except Exception as e:
+        logger.error(f"Airflow - database/loadtoDB.py - Error occurred while fetching new job: {e}", )
+    
+    finally:
+        close_connection(conn)
+        return refresh_token
+    
+
+def update_job_timestamp(logger, email):
+    logger.info("Airflow - database/loadtoDB.py - update_job_timestamp() - Updating job's updated_at timestamp")
+
+    conn = create_connection_to_postgresql()
+    update_status = False
+
+    if not conn:
+        logger.info("Airflow - database/loadtoDB.py - update_job_timestamp() - Failed to connect to database")
+        
+        return update_status
+
+    try:
+        update_query = """
+            UPDATE queued_jobs 
+            SET updated_at = CURRENT_TIMESTAMP 
+            WHERE email = %s;
+        """
+
+        with conn.cursor() as cursor:
+            cursor.execute(update_query, (email,))
+            
+            if cursor.rowcount > 0:
+                logger.info(f"Airflow - database/loadtoDB.py - Successfully updated job's updated_at timestamp for email: {email}")
+                
+                conn.commit()
+                update_status = True
+            
+            else:
+                logger.warning(f"Airflow - database/loadtoDB.py - No job found with email {email} to update.")
+                update_status = False
+    
+    except Exception as e:
+        logger.error(f"Error occurred while updating job's timestamp: {e}")
+        update_status = False
+    
+    finally:
+        close_connection(conn)
+        return update_status
