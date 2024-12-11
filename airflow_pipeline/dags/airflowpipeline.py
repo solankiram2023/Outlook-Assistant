@@ -11,6 +11,7 @@ from database.loadtoDB import load_users_tokendata_to_db, fetch_new_job, update_
 from services.processEmails import process_emails
 from services.processEmailAttachments import process_emails_with_attachments
 from services.extractAttachments import extract_contents_from_attachments
+from services.processEmailFolders import get_email_folders
 
 # Initialize logger
 logger = start_logger()
@@ -144,6 +145,27 @@ def process_user_token(**context):
         logger.error(f"Task: process_user_token - Error in process_user_token: {e}")
         context['task_instance'].xcom_push(key='user_email', value=None)
         raise
+
+
+def process_email_folders(**context):
+    """Process email folders and save to database"""
+    try:
+        logger.info("Task: process_email_folders - Processing email folders")
+        
+        # Get access token from previous task
+        formatted_token = context['task_instance'].xcom_pull(task_ids='get_token_task', key='formatted_token')
+
+        if formatted_token is None:
+            raise ValueError("formatted_token contains None instead of a dictionary in process_email_folders")
+
+        # Process email folders
+        get_email_folders(logger, formatted_token['access_token'])
+        logger.info("Task: process_email_folders - Email folders processed successfully")
+    
+    except Exception as e:
+        logger.error(f"Task: process_email_folders - Error in process_email_folders: {e}")
+        raise
+
 
 def process_email_data(**context):
     """Process email data"""
@@ -282,6 +304,13 @@ with DAG(
         dag=dag,
     )
 
+    process_folders_task = PythonOperator(
+        task_id='process_folders_task',
+        python_callable=process_email_folders,
+        provide_context=True,
+        dag=dag,
+    )
+
     process_emails_task = PythonOperator(
         task_id='process_emails_task',
         python_callable=process_email_data,
@@ -311,7 +340,4 @@ with DAG(
     )
 
     # Task dependencies
-    setup_db_task >> get_token_task >> process_token_task >> process_emails_task >> process_attachments_task >> extract_contents_task >> update_job_task
-
-    # Some of these tasks rely on previous tasks for essential data.
-    # Expect a cascading failure when it happens.
+    setup_db_task >> get_token_task >> process_token_task >> process_folders_task >> process_emails_task >> process_attachments_task >> extract_contents_task >> update_job_task
