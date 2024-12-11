@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from services.logger import start_logger
 from auth.accessToken import get_token_response, format_token_response
 from database.setupTables import create_tables_in_db
-from database.loadtoDB import load_users_tokendata_to_db
+from database.loadtoDB import load_users_tokendata_to_db, fetch_new_job, update_job_timestamp
 from services.processEmails import process_emails
 from services.processEmailAttachments import process_emails_with_attachments
 from services.extractAttachments import extract_contents_from_attachments
@@ -59,13 +59,18 @@ def get_and_format_token(**context):
             logger.info(f"RECEIVED DATA {context['dag_run'].conf}")
 
         else:
-            logger.info("Task: get_and_format_token - Fetching tokens from environment variables")
+            logger.info("Task: get_and_format_token - Fetching endpoint from environment variable")
             
-            refresh_token = os.getenv("REFRESH_TOKEN")
             endpoint = os.getenv("ENDPOINT")
 
-            if not refresh_token or not endpoint:
-                raise ValueError("Missing required environment variables")
+            if not endpoint:
+                raise ValueError("Endpoint environment variable seems to be missing")
+            
+            logger.info("Task: get_and_format_token - Fetching refresh tokens from database")
+            refresh_token = fetch_new_job(logger)
+
+            if refresh_token is None:
+                raise ValueError("No refresh tokens found from the database")
         
             # Get token response
             token_response = get_token_response(logger, endpoint, refresh_token)
@@ -213,6 +218,26 @@ def extract_attachment_contents(**context):
         logger.error(f"Task: extract_attachment_contents - Error in extract_attachment_contents: {e}")
         raise
 
+def update_job(**context):
+    """ Update the job's updated_at time in the database """
+
+    try:
+        logger.info("Task: update_job - Updating job's updated_at timestamp")
+        
+        # Get necessary data from previous tasks
+        formatted_token = context['task_instance'].xcom_pull(task_ids='get_token_task', key='formatted_token')
+
+        if formatted_token is None:
+            raise ValueError("formatted_token contains None instead of a dictionary in update_job")
+        
+        update_status = update_job_timestamp(logger, formatted_token['email'])
+        if not update_status:
+            raise ValueError(f"Failed to update status for email {formatted_token['email']} in the queued_jobs table")
+        
+    except Exception as e:
+        logger.error(f"Task: update_job - Error in update_job: {e}")
+        raise
+
 
 # Default arguments for our DAG
 default_args = {
@@ -236,16 +261,16 @@ with DAG(
 ) as dag:
 
     # Define tasks
-    get_token_task = PythonOperator(
-        task_id='get_token_task',
-        python_callable=get_and_format_token,
+    setup_db_task = PythonOperator(
+        task_id='setup_db_task',
+        python_callable=setup_database,
         provide_context=True,
         dag=dag,
     )
 
-    setup_db_task = PythonOperator(
-        task_id='setup_db_task',
-        python_callable=setup_database,
+    get_token_task = PythonOperator(
+        task_id='get_token_task',
+        python_callable=get_and_format_token,
         provide_context=True,
         dag=dag,
     )
@@ -278,8 +303,15 @@ with DAG(
         dag=dag,
     )
 
+    update_job_task = PythonOperator(
+        task_id='update_job_task',
+        python_callable=update_job,
+        provide_context=True,
+        dag=dag,
+    )
+
     # Task dependencies
-    get_token_task >> setup_db_task >> process_token_task >> process_emails_task >> process_attachments_task >> extract_contents_task
+    setup_db_task >> get_token_task >> process_token_task >> process_emails_task >> process_attachments_task >> extract_contents_task >> update_job_task
 
     # Some of these tasks rely on previous tasks for essential data.
     # Expect a cascading failure when it happens.
