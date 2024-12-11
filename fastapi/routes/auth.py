@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 
 from utils.logs import start_logger
 from utils.variables import load_env_vars
-from utils.fetchmails import fetch_emails, load_email
+from utils.services import fetch_emails, load_email
 from auth.authenticate import request_auth_token, request_access_tokens, refresh_access_tokens
 
 # Start the router
