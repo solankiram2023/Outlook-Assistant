@@ -15,6 +15,7 @@ def create_tables_in_db(logger):
                 "drop_categories_table"             : "DROP TABLE IF EXISTS categories CASCADE;",
                 "drop_email_links_table"            : "DROP TABLE IF EXISTS email_links CASCADE;",
                 "drop_queued_jobs_table"            : "DROP TABLE IF EXISTS queued_jobs CASCADE;",
+                "drop_email_folders_table"          : "DROP TABLE IF EXISTS email_folders CASCADE"
             },
         "create_tables": {
                 "create_users_table": """
@@ -131,6 +132,19 @@ def create_tables_in_db(logger):
                         is_current_link_processed BOOLEAN DEFAULT FALSE,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """,
+                "create_email_folders_table": """
+                    CREATE TABLE email_folders (
+                        id VARCHAR(255) PRIMARY KEY,
+                        display_name VARCHAR(255) NOT NULL,
+                        parent_folder_id VARCHAR(255),
+                        child_folder_count INT DEFAULT 0,
+                        unread_item_count INT DEFAULT 0,
+                        total_item_count INT DEFAULT 0,
+                        size_in_bytes BIGINT DEFAULT 0,
+                        is_hidden BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """
 
