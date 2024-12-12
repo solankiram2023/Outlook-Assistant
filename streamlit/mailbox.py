@@ -136,18 +136,19 @@ def initialize_session_state():
 
 # Fetch emails and update session state
 def fetch_emails(email_service):
-    with st.spinner('Fetching emails...'):
-        response = email_service.fetch_emails()
+    with st.spinner(f'Fetching emails from {st.session_state.selected_folder}......'):
+        response = email_service.fetch_emails(folder=st.session_state.selected_folder)
         if response["status"] == 200:
             emails_data = response["data"]
-            logger.info(f"Processing {len(emails_data)} emails")
+            logger.info(f"Processing {len(emails_data)} emails from {st.session_state.selected_folder}")
             st.session_state.emails = [
                 {
                     "id": email["email_id"],
                     "sender": email["sender_name"],
                     "email": email["sender_email"],
                     "subject": email["subject"],
-                    "content": email["body_preview"] if email.get("body_preview") else "",
+                    "content": email.get("body", ""),  # Use full body instead of preview
+                    "preview": email.get("body_preview", ""),
                     "date": email["received_datetime"],
                     "read": email.get("is_read", False),
                     "starred": False,
@@ -173,7 +174,7 @@ def load_email_content(email_id):
 
 # Render email list
 def render_email_list():
-    st.markdown("### Inbox")
+    st.markdown(f"### {st.session_state.selected_folder}")
 
     # Add audio recorder with transcription
     st.write("Search by voice:")
@@ -316,8 +317,6 @@ def render_selected_email():
 
             with col_reply2:
                 st.button("Save as Draft")
-        else:
-            st.markdown("### Select an email to read")
 
 # Main mailbox function
 def render_mailbox():

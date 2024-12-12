@@ -14,11 +14,11 @@ class EmailService:
         self.s3_client = boto3.client('s3')
         logger.info(f"EmailService initialized with base URL: {self.base_url}")
     
-    def fetch_emails(self) -> Dict[str, Any]:
+    def fetch_emails(self, folder) -> Dict[str, Any]:
         """Fetch all emails from the API."""
         try:
             logger.info("Fetching emails from API...")
-            response = requests.get(f"{self.base_url}/fetch_emails")
+            response = requests.get(f"{self.base_url}/fetch_emails/{folder}")
             response.raise_for_status()
             data = response.json()
             logger.info(f"Successfully fetched {len(data.get('data', []))} emails")
