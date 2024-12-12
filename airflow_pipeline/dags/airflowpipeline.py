@@ -152,18 +152,33 @@ def process_email_folders(**context):
     try:
         logger.info("Task: process_email_folders - Processing email folders")
         
-        # Get access token from previous task
-        formatted_token = context['task_instance'].xcom_pull(task_ids='get_token_task', key='formatted_token')
+        # Get the task instance
+        task_instance = context['task_instance']
+        
+        # Try to get the FOLDERS_PROCESSED state from XCom
+        folders_processed = task_instance.xcom_pull(key='FOLDERS_PROCESSED', include_prior_dates=True)
+        
+        if not folders_processed:
+            # Get access token from previous task
+            formatted_token = context['task_instance'].xcom_pull(task_ids='get_token_task', key='formatted_token')
 
-        if formatted_token is None:
-            raise ValueError("formatted_token contains None instead of a dictionary in process_email_folders")
+            if formatted_token is None:
+                raise ValueError("formatted_token contains None instead of a dictionary in process_email_folders")
 
-        # Process email folders
-        get_email_folders(logger, formatted_token['access_token'])
-        logger.info("Task: process_email_folders - Email folders processed successfully")
+            # Process email folders
+            get_email_folders(logger, formatted_token['access_token'])
+            logger.info("Task: process_email_folders - Email folders processed successfully")
+            
+            # Set FOLDERS_PROCESSED to True in XCom
+            task_instance.xcom_push(key='FOLDERS_PROCESSED', value=True)
+            logger.info("Task: process_email_folders - FOLDERS_PROCESSED set to True")
+        else:
+            logger.info("Task: process_email_folders - Email folders already processed, skipping folder creation")
     
     except Exception as e:
         logger.error(f"Task: process_email_folders - Error in process_email_folders: {e}")
+        # Make sure to set FOLDERS_PROCESSED to False if there's an error
+        context['task_instance'].xcom_push(key='FOLDERS_PROCESSED', value=False)
         raise
 
 
@@ -308,6 +323,7 @@ with DAG(
         task_id='process_folders_task',
         python_callable=process_email_folders,
         provide_context=True,
+        trigger_rule='all_success',
         dag=dag,
     )
 
