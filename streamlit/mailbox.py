@@ -147,8 +147,7 @@ def fetch_emails(email_service):
                     "sender": email["sender_name"],
                     "email": email["sender_email"],
                     "subject": email["subject"],
-                    "content": email.get("body", ""),  # Use full body instead of preview
-                    "preview": email.get("body_preview", ""),
+                    "content": email["body_preview"] if email.get("body_preview") else "",
                     "date": email["received_datetime"],
                     "read": email.get("is_read", False),
                     "starred": False,
@@ -167,10 +166,17 @@ def load_email_content(email_id):
     email_response = email_service.load_email(email_id)
     if email_response["status"] == 200:
         email_data = email_response["data"]
-        for email in st.session_state.emails:
+        # Find the index of the email in session state
+        for idx, email in enumerate(st.session_state.emails):
             if email['id'] == email_id:
-                email['content'] = email_data['body']
-                email['attachments'] = email_data.get('attachments', [])
+                # Create a new dictionary to avoid reference issues
+                st.session_state.emails[idx] = {
+                    **email,  # Spread existing email data
+                    'content': email_data['body'],  # Update content
+                    'attachments': email_data.get('attachments', [])
+                }
+                print(f"Updated content in session state: {st.session_state.emails[idx]['content']}")
+
 
 # Render email list
 def render_email_list():
@@ -241,8 +247,10 @@ def render_email_list():
                 with cols[1]:
                     # Ensure unique key using idx from enumerate
                     if st.button("View", key=f"select_{email['id']}_{idx}", use_container_width=True):
+                        print(f"Before setting selected email: {email['content']}")
                         st.session_state.selected_email_id = email["id"]
                         load_email_content(email["id"])
+                        print(f"After loading content: {st.session_state.emails[idx]['content']}")
                         st.rerun()
 
 
@@ -257,6 +265,7 @@ def render_selected_email():
         )
 
         if selected_email:
+            print(f"Selected email content: {selected_email['content']}")
             header_col1, header_col2, header_col3 = st.columns([8, 2, 1])
 
             with header_col1:
@@ -298,7 +307,8 @@ def render_selected_email():
             st.markdown(f"**Date:** {datetime.fromisoformat(selected_email['date']).strftime('%b %d, %Y %I:%M %p')}")
 
             st.markdown("---")
-            content_with_newlines = selected_email['content'].replace('\n', '<br>')
+            print(f"Email content: {selected_email['content']}")
+            content_with_newlines = selected_email['content']
             st.markdown(content_with_newlines, unsafe_allow_html=True)
 
             if selected_email.get('attachments'):
@@ -317,6 +327,7 @@ def render_selected_email():
 
             with col_reply2:
                 st.button("Save as Draft")
+
 
 # Main mailbox function
 def render_mailbox():
