@@ -11,16 +11,16 @@ env = load_env_vars()
 # Initialize Logger
 logger = start_logger()
 
-def fetch_emails():
+def fetch_emails(folder_name):
     ''' Fetches email data from the PostgreSQL database and returns a dictionary '''
     
-    logger.info("UTILS/EMAILS - fetch_emails() - Fetching emails")
+    logger.info(f"UTILS/EMAILS - services/fetch_emails() - Fetching emails from folder {folder_name}")
     
     conn = open_connection()
     response = None
 
     if conn is None:
-        logger.error("UTILS/EMAILS - fetch_emails() - Database connection failed")
+        logger.error("UTILS/EMAILS - services/fetch_emails() - Database connection failed")
         
         return {
             "status"  : status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -47,6 +47,8 @@ def fetch_emails():
                     emails e ON r.email_id = e.id
                 INNER JOIN 
                     senders s ON e.id = s.email_id
+                INNER JOIN
+                    email_folders f ON e.parent_folder_id = f.id
                 WHERE 
                     r.email_address IN (
                         SELECT 
@@ -54,15 +56,16 @@ def fetch_emails():
                         FROM 
                             users
                     )
+                    AND f.display_name = %(folder_name)s
                 ORDER BY 
                     e.received_datetime DESC;
             """
-            logger.info("UTILS/EMAILS - fetch_emails() - Executing SQL query")
-            cursor.execute(query)
+            logger.info("UTILS/EMAILS - services/fetch_emails() - Executing SQL query")
+            cursor.execute(query, {'folder_name': folder_name})
             records = cursor.fetchall()
 
             if not records:
-                logger.info("UTILS/EMAILS - fetch_emails() - No records found")
+                logger.info("UTILS/EMAILS - services/fetch_emails() - No records found")
                 
                 response = {
                     "status"  : status.HTTP_404_NOT_FOUND,
@@ -78,7 +81,7 @@ def fetch_emails():
                     record["received_datetime"] = record["received_datetime"].isoformat()
 
 
-            logger.info(f"UTILS/EMAILS - fetch_emails() - {len(records)} records fetched successfully")
+            logger.info(f"UTILS/EMAILS - services/fetch_emails() - {len(records)} records fetched successfully from {folder_name}")
             response = {
                 "status"  : status.HTTP_200_OK,
                 "data"    : records,
@@ -86,7 +89,7 @@ def fetch_emails():
             }
 
     except Exception as e:
-        logger.error(f"UTILS/EMAILS - fetch_emails() - Error executing query: {str(e)}")
+        logger.error(f"UTILS/EMAILS - services/fetch_emails() - Error executing query: {str(e)}")
         
         response =  {
             "status"  : status.HTTP_500_INTERNAL_SERVER_ERROR,

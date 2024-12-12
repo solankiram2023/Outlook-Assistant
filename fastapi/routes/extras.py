@@ -1,9 +1,10 @@
 from utils.logs import start_logger
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Request
 from utils.variables import load_env_vars
 from fastapi.responses import JSONResponse
 from auth.authenticate import refresh_access_tokens, is_token_valid
 from database.jobs import dequeue_job, trigger_airflow, delete_failed_jobs, fetch_user_via_job
+from utils.services import fetch_emails, load_email
 
 # Start the router
 router  = APIRouter()
@@ -92,4 +93,43 @@ def dispatch_pending_jobs():
             "type"      : "string",
             "message"   : "Either no jobs are pending or failed to dispatch job"
         }
+    )
+
+
+# Router to fetch emails
+@router.get(
+    path        = env["FETCH_MAILS_ENDPOINT"] + "/{folder_name}",
+    name        = "Fetch Emails",
+    description = "Endpoint to fetch emails with sender email, body preview, and subject",
+    tags        = ["Emails"]
+)
+def fetch_emails_endpoint(folder_name: str):
+
+    logger.info(f"ROUTES/EMAILS - fetch_emails_endpoint() - GET /fetch_emails/{folder_name} Request to fetch email data received")
+
+    response = fetch_emails(folder_name)  
+
+    return JSONResponse(
+        status_code = response["status"],
+        content     = response
+    )
+
+
+# Router to load an email
+@router.get(
+    path        = env["LOAD_MAILS_ENDPOINT"] + "/{email_id}",
+    name        = "Load Email",
+    description = "Endpoint to load email details by email ID",
+    tags        = ["Emails"]
+)
+def load_email_endpoint(email_id: str):
+
+    logger.info(f"ROUTES/EMAILS - load_email_endpoint() - GET /load_email/{email_id} Request to load email details")
+
+    response = load_email(email_id)
+
+    # Return the dictionary as a JSONResponse
+    return JSONResponse(
+        status_code = response["status"],
+        content     = response
     )
