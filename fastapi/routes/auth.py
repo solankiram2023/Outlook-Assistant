@@ -2,7 +2,9 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.responses import JSONResponse
 import os
-
+import openai
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from datetime import datetime
 from utils.logs import start_logger
 from utils.variables import load_env_vars
 from auth.authenticate import request_auth_token, request_access_tokens, refresh_access_tokens
@@ -162,3 +164,40 @@ def renew_access_tokens(request: Request):
 
     logger.info(f"ROUTES/AUTH - renew_access_tokens() - Redirecting to {redirect_url}")
     return RedirectResponse(redirect_url)
+
+@router.post("/transcribe")
+async def transcribe_audio(audio: UploadFile = File(...)):
+    try:
+        # Create directories if they don't exist
+        os.makedirs("temp_audio", exist_ok=True)
+        os.makedirs("transcriptions", exist_ok=True)
+        
+        # Generate timestamp for unique filenames
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        # Save the uploaded file
+        audio_path = f"temp_audio/server_{timestamp}_{audio.filename}"
+        with open(audio_path, "wb") as buffer:
+            content = await audio.read()
+            buffer.write(content)
+        
+        # Transcribe using OpenAI Whisper
+        with open(audio_path, "rb") as audio_file:
+            transcript = openai.Audio.transcribe(
+                "whisper-1",
+                audio_file
+            )
+        
+        # Save transcription
+        transcription_path = f"transcriptions/server_{timestamp}_transcription.txt"
+        with open(transcription_path, "w") as f:
+            f.write(transcript["text"])
+        
+        return {
+            "transcription": transcript["text"],
+            "audio_path": audio_path,
+            "transcription_path": transcription_path
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
