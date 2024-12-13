@@ -328,8 +328,10 @@ def RespondToEmailNode(state: AgentState):
 
         state["messages"].append(success_message)
         state["response_output"] = {
-            "subject"      : result["subject"],
-            "plain_text"   : result["plain_text"],
+            "recipient_email"   : state["email_context"].get("recipient_email", None),
+            "recipient_name"    : state["email_context"].get("recipient_name", None),
+            "subject"           : result["subject"],
+            "body"              : result["plain_text"],
         }
 
     else:
