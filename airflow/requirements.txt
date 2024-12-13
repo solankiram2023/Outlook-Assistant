@@ -14,5 +14,4 @@ python-docx
 mammoth
 openpyxl
 pymupdf
-pymilvus
-langchain-milvus
+tiktoken
