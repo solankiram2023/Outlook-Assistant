@@ -5,6 +5,19 @@ from fastapi.responses import JSONResponse
 from auth.authenticate import refresh_access_tokens, is_token_valid
 from database.jobs import dequeue_job, trigger_airflow, delete_failed_jobs, fetch_user_via_job
 from utils.services import fetch_emails, load_email, get_email_category
+from agents.controller import process_input
+from pydantic import BaseModel
+from typing import Dict
+
+# Validation classes
+class EmailContext(BaseModel):
+    email_id: str
+
+class RequestData(BaseModel):
+    user_input: str
+    user_email: str
+    email_context: EmailContext
+
 
 # Start the router
 router  = APIRouter()
@@ -105,7 +118,7 @@ def dispatch_pending_jobs():
 )
 def fetch_emails_endpoint(folder_name: str):
 
-    logger.info(f"ROUTES/EMAILS - fetch_emails_endpoint() - GET /fetch_emails/{folder_name} Request to fetch email data received")
+    logger.info(f"ROUTES/EXTRAS - fetch_emails_endpoint() - GET /fetch_emails/{folder_name} Request to fetch email data received")
 
     response = fetch_emails(folder_name)  
 
@@ -124,7 +137,7 @@ def fetch_emails_endpoint(folder_name: str):
 )
 def load_email_endpoint(email_id: str):
 
-    logger.info(f"ROUTES/EMAILS - load_email_endpoint() - GET /load_email/{email_id} Request to load email details")
+    logger.info(f"ROUTES/EXTRAS - load_email_endpoint() - GET /load_email/{email_id} Request to load email details")
 
     response = load_email(email_id)
 
@@ -144,7 +157,7 @@ def load_email_endpoint(email_id: str):
 )
 def get_category_endpoint(email_id: str):
 
-    logger.info(f"ROUTES/EMAILS - get_category_endpoint() - GET /get_category/{email_id} Request to get email category")
+    logger.info(f"ROUTES/EXTRAS - get_category_endpoint() - GET /get_category/{email_id} Request to get email category")
 
     response = get_email_category(email_id)
 
@@ -153,3 +166,53 @@ def get_category_endpoint(email_id: str):
         status_code = response["status"],
         content     = response
     )
+
+# Router to interact with LangGraph agents
+@router.post(
+    path        = env["CHAT_ENDPOINT"],
+    name        = "Chatbot endpoint",
+    description = "Endpoint to interact with LLM via LangGraph Agents",
+    tags        = ["Chat"]
+)
+async def chatbot_handler(user_data: RequestData):
+    """ Interact with LangGraph Agents via the chatbot interface """
+
+    logger.info(f"ROUTES/EXTRAS - chatbot_handler() - GET {env["CHAT_ENDPOINT"]} Starting chatbot")
+
+    user_data = user_data.model_dump()
+
+    result = await process_input(
+        user_input    = user_data["user_input"],
+        user_email    = user_data["user_email"],
+        email_context = {
+            "email_id": user_data["email_context"]["email_id"],
+        }
+    )
+
+    try:
+        logger.info(f"ROUTES/EXTRAS - chatbot_handler() - GET {env["CHAT_ENDPOINT"]} Starting chatbot")
+
+        response_data = {
+            "current_input"        : result.get("current_input", None),
+            "email_context"        : result.get("email_context", None),
+            "user_email"           : result.get("user_email", None),
+            "corrected_prompt"     : result.get("corrected_prompt", None),
+            "rag_status"           : result.get("rag_status", None),
+            "rag_response"         : result.get("rag_response", None),
+            "conversation_summary" : result.get("conversation_summary", None),
+            "response_output"      : result.get("response_output", None)
+        }
+
+        return JSONResponse(
+            status_code = status.HTTP_200_OK,
+            content     = response_data
+        )
+
+    except Exception as exception:
+        logger.error(f"ROUTES/EXTRAS - chatbot_handler() - Error occurred while handling chatbot (See exception below)")
+        logger.error(f"ROUTES/EXTRAS - chatbot_handler() - {exception}")
+
+        return JSONResponse(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content     = {}
+        )
