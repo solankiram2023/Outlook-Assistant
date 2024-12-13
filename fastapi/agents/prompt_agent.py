@@ -216,14 +216,14 @@ async def DecideNextStepNode(state: AgentState):
                 You are a helpful AI assistant. Your job is to call one of the provided tools. 
                 
                 If the user wants to:
-                - Find similar emails: Use GeneratePromptForRAG
                 - Respond to the email: Use RespondToEmailBasedOnUserPrompt
+                - Else: Use GeneratePromptForRAG. If not using the RespondToEmailBasedOnUserPrompt tool then you must strictly use the GeneratePromptForRAG tool
                 
                 User's Request: {state['current_input']}
                 Email Context: {state.get('email_context', {})}
                 
                 Analyze the user's request and call the appropriate tool.
-                You must strictly make a tool call. Do not perform anything else.
+                You must strictly make atleast one tool call. Do not perform anything else.
             """
         )
     ])
