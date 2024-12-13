@@ -88,16 +88,43 @@ def get_initials(name):
     return ''.join(word[0].upper() for word in name.split() if word)
 
 def get_category(email):
-    categories = {
-        'Work': ("Work", "#e8f0fe"),
-        'Client Issue': ("Client Issue", "#fce8e6"),
-        'Marketing': ("Marketing", "#e6f4ea"),
-        'IT Support': ("IT Support", "#fff0e0"),
-        'Legal/Contracts': ("Legal/Contracts", "#f3e8fd"),
-        'HR/Benefits': ("HR/Benefits", "#f7f8fb")
+
+    category_colors = {
+        'WORK': "#e8f0fe",        # Professional blue
+        'MARKETING': "#e6f4ea",    # Light green
+        'SOCIAL': "#f3e8fd",       # Light purple
+        'UPDATES': "#fff0e0",      # Light orange
+        'PERSONAL': "#fce8e6",     # Light red
+        'BILLING': "#fdcfe8",      # Light pink
+        'TRAVEL': "#ceead6",       # Mint green
+        'EDUCATION': "#d2e3fc",    # Sky blue
+        'HEALTH': "#d4e3d4",       # Sage green
+        'PROFANITY': "#f28b82",    # Warning red
+        'SPAM': "#e8eaed",         # Light grey
+        'OTHER': "#f0f0f0"         # Default grey
     }
-    category_name, color = categories.get(email['category'], ("Other", "#f0f0f0"))
-    return category_name, color
+
+    try:
+        # Get categories for this email from email service
+        response = email_service.get_email_category(email['id'])
+        
+        if response["status"] == 200 and response["data"]:
+            # Process all categories from response
+            categories = []
+            for category in response["data"]:
+                category_upper = category.upper()
+                categories.append({
+                    'name': category_upper,
+                    'color': category_colors.get(category_upper, category_colors['OTHER'])
+                })
+            return categories
+        
+        # Return default if no categories found
+        return [{'name': 'OTHER', 'color': category_colors['OTHER']}]
+        
+    except Exception as e:
+        logger.error(f"Error getting categories: {str(e)}")
+        return [{'name': 'OTHER', 'color': category_colors['OTHER']}]
 
 def initialize_session_state():
     if 'show_chatbot' not in st.session_state:
@@ -225,14 +252,20 @@ def render_email_list():
     # Filter emails based on search query
     filtered_emails = st.session_state.get("emails", [])
     if search_query:
-        filtered_emails = [
-            email for email in filtered_emails
-            if search_query in email.get("sender", "").lower() or
-            search_query in email.get("email", "").lower() or
-            search_query in email.get("subject", "").lower() or
-            search_query in email.get("content", "").lower() or
-            search_query in email.get("category", "").lower()
-        ]
+        filtered_emails = []
+        for email in st.session_state.get("emails", []):
+            # Get categories for the email
+            email_categories = get_category(email)
+            # Convert categories to lowercase for case-insensitive search
+            category_names = [cat['name'].lower() for cat in email_categories]
+            
+            # Check if search query matches any email field or categories
+            if (search_query in email.get("sender", "").lower() or
+                search_query in email.get("email", "").lower() or
+                search_query in email.get("subject", "").lower() or
+                search_query in email.get("content", "").lower() or
+                any(search_query in cat_name for cat_name in category_names)):
+                filtered_emails.append(email)
 
     # Email List Container
     email_list_container = st.container()
@@ -246,7 +279,7 @@ def render_email_list():
                 st.info("No emails found. Please refresh or try again.")
         else:
             for idx, email in enumerate(filtered_emails):
-                category, bg_color = get_category(email)
+                categories = get_category(email)
                 initials = get_initials(email["sender"])
 
                 with st.container():
@@ -256,17 +289,25 @@ def render_email_list():
                     with cols[0]:
                         preview_content = email["content"][:50] + "..." if email["content"] else "No preview available"
 
+                        category_tags_html = "".join([
+                            f'<span class="category-tag" style="display: inline-block; margin-right: 5px; '
+                            f'padding: 2px 8px; font-size: 11px; border-radius: 12px; '
+                            f'background-color: {cat["color"]}; color: #333;">'
+                            f'{cat["name"]}</span>'
+                            for cat in categories
+                        ])
+
                         email_html = f"""
                         <div class="email-list-item" style="margin-bottom: 10px;">
-                            <div class="profile-pic" style="background-color: {bg_color}; width: 50px; height: 50px; border-radius: 25px; display: inline-block; text-align: center; line-height: 50px;">
+                            <div class="profile-pic" style="background-color: {categories[0]['color']}; width: 50px; height: 50px; border-radius: 25px; display: inline-block; text-align: center; line-height: 50px;">
                                 <span style="color: gray; font-size: 14px;">{initials}</span>
                             </div>
                             <div class="email-content-preview" style="display: inline-block; margin-left: 10px; vertical-align: top; width: calc(100% - 70px);">
                                 <div class="sender-name" style="font-weight: bold; font-size: 14px;">{email['sender']}</div>
                                 <div class="email-subject" style="color: #555; font-size: 12px;">{email['subject']}</div>
                                 <div style="font-size: 12px; color: #777;">{preview_content}</div>
-                                <div class="category-tag" style="margin-top: 5px; display: inline-block; padding: 2px 5px; font-size: 10px; border-radius: 3px; background-color: {bg_color}; color: white;">
-                                    {category}
+                                <div class="category-tags" style="margin-top: 5px;">
+                                    {category_tags_html}
                                 </div>
                             </div>
                         </div>
@@ -284,7 +325,6 @@ def render_email_list():
                             load_email_content(email["id"])
                             logger.info(f"Stored selected_email_id: {email['id']}")
                             st.rerun()
-
 
 
 # Render selected email
