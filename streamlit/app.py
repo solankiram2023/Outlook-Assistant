@@ -3,6 +3,8 @@ import streamlit as st
 from datetime import datetime
 from mailbox import render_mailbox
 from email_service import EmailService
+import webbrowser
+import os
 
 # Initialize EmailService
 email_service = EmailService()
@@ -57,6 +59,37 @@ def render_sidebar():
                 if count > 0:
                     st.markdown(f"<div class='folder-count'>{count}</div>", unsafe_allow_html=True)
 
+def sign_in_page():
+    col1, col2 = st.columns([6, 1])
+    
+    with col1:
+        st.title("Outlook Email Management Assistant")
+    
+    with col2:
+        if st.button("Sign In"):
+            try:
+                base_url = os.getenv("FASTAPI_URL")
+                sign_in_url = f"{base_url}{os.getenv('SIGN_IN_ENDPOINT')}"
+                webbrowser.open(sign_in_url)
+                st.session_state.authenticated = True
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error connecting to authentication server: {str(e)}")
+
+def check_authentication():
+    """Check if user is authenticated with the email service"""
+    try:
+        # Test authentication by trying to fetch emails
+        response = email_service.fetch_emails(folder="Inbox")
+        return response["status"] == 200
+    except Exception:
+        return False
+
 if __name__ == "__main__":
-    render_sidebar()
-    render_mailbox()
+    # Check authentication status
+    if not check_authentication():
+        sign_in_page()
+    else:
+        st.session_state.authenticated = True
+        render_sidebar()
+        render_mailbox()
