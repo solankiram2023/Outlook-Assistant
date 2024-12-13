@@ -3,7 +3,7 @@ import csv
 import base64
 import logging
 from typing import Dict, Optional
-import fitz
+import pymupdf as fitz
 from docx import Document
 import mammoth
 from openpyxl import load_workbook
@@ -32,9 +32,9 @@ def image_summarize(logger, img_base64, prompt):
     logger.info(f"Ariflow - image_summarize - Summarizing image with GPT")
     try:
         chat = ChatOpenAI(
-            model="gpt-4o", 
-            max_tokens=1024,
-            api_key=os.getenv("OPENAI_API_KEY")
+            model       = "gpt-4o", 
+            max_tokens  = 1024,
+            api_key     = os.getenv("OPENAI_API_KEY")
         )
 
         msg = chat.invoke(
