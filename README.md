@@ -1,14 +1,14 @@
 # Outlook Assistant
 
 ## Overview
-The Outlook Email Management Assistant enables users to efficiently manage their inboxes by leveraging OpenAI, Retrieval-Augmented Generation (RAG), natural language processing, and automation to streamline email management. It focuses on simplifying email management with features like query-based email interaction, email summarization, categorization, automatic responses to the emails, real-time translation, and audio transcription for accessibility. By automating these tasks, this tool will help users save time, improve productivity, reduce email overload, and ensure they never miss crucial communications, all while enhancing accessibility for users with different needs.
+The Outlook Email Management Assistant enables users to efficiently manage their inboxes by leveraging OpenAI, Retrieval-Augmented Generation (RAG), natural language processing, and automation to streamline email management. It focuses on simplifying email management with features like query-based email interaction, email summarization, categorization, automatic responses to emails, real-time translation, and audio transcription for accessibility. By automating these tasks, this tool will help users save time, improve productivity, reduce email overload, and ensure they never miss crucial communications, all while enhancing accessibility for users with different needs.
 
 ## Links
 
 ### Application Links
-Streamlit:
-FastAPI:
-Airflow: 
+Streamlit: http://3.129.73.242:8501
+
+FastAPI: http://3.129.73.242:5000/docs
 
 ### Documentation
 Codelabs Link: https://codelabs-preview.appspot.com/?file_id=19F-oNrpfrvN73wmcrOozv6A72wKVv1PLru9mqvLXvps#0
@@ -102,7 +102,81 @@ pip install -r requirements.txt
 11. Streamlit - A web application framework used to create a user-friendly interface.
 
 ## Project Structure
+```
+project_root/
+│
+├── airflow/                      
+│   └── dags/
+│       ├── auth/
+│       │   └── accessToken.py
+│       ├── database/
+│       │   ├── connectDB.py
+│       │   ├── loadtoDB.py
+│       │   └── setupTables.py
+│       ├── services/            
+│       │   ├── extractAttachments.py
+│       │   ├── extractFileContents.py
+│       │   ├── labeling.py
+│       │   ├── logger.py
+│       │   ├── processEmailAttachments.py
+│       │   ├── processEmailFolders.py
+│       │   ├── processEmails.py
+│       │   └── vectors.py
+│       ├── .env.example
+│       ├── airflowpipeline.py
+│       └── .gitignore
+│
+├── diagrams/                   
+│
+├── fastapi/                    
+│   ├── agents/                 
+│   │   ├── controller.py
+│   │   ├── init.py
+│   │   ├── prompt_agent.py
+│   │   ├── rag_agent.py
+│   │   ├── response_agent.py
+│   │   ├── state.py
+│   │   ├── summary_agent.py
+│   │   └── summary_attachments.py
+│   ├── auth/                    
+│   │   ├── authenticate.py
+│   │   └── init.py
+│   ├── database/               
+│   │   ├── authstorage.py
+│   │   ├── connection.py
+│   │   ├── init.py
+│   │   └── jobs.py
+│   ├── routes/                 
+│   │   ├── auth.py
+│   │   ├── extras.py
+│   │   └── init.py
+│   ├── utils/                 
+│   │   ├── init.py
+│   │   ├── logs.py
+│   │   ├── services.py
+│   │   └── variables.py
+│   ├── .env.example
+│   ├── app.py
+│   ├── dummy.py
+│   └── requirements.txt
+│
+├── streamlit/                 
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── app.py                 
+│   ├── email_service.py       
+│   ├── mailbox.py            
+│   ├── signin.py             
+│   ├── style.css            
+│   ├── README.md
+│   └── requirements.txt
+│
+├── Dockerfile                
+├── docker-compose.yml       
+├── env                     
+├── requirements.txt       
+└── .gitignore
 
+```
 
-## How to run the application locally
 
