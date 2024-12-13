@@ -28,10 +28,17 @@ Ramy Solanki         | 002816593 | 33% | JWT Implementation, DB Schema
 
 ## Airflow
 The Airflow pipeline streamlines the process of managing email data by automating tasks such as fetching emails, processing attachments, extracting content, and organizing data for efficient retrieval and analysis.
+1. Fetches emails using the Microsoft Graph API, authorized with an access token received from the FastAPI application. Extracted email contents are loaded into the Amazon RDS (PostgreSQL) database, following the defined database schema.
+2. Receives access token responses from FastAPI, formats the token response, and stores user details along with token information in Amazon RDS.
+3. Identifies emails with attachments and sends requests to fetch the attachment files. Downloads the attachments to Amazon S3, organized for scalable storage and accessibility.
+4. Extract content from email attachments using tools like PyMuPDF. Stores the extracted content locally for further processing, including creating vector embeddings.
+5. Generates vector embeddings for email contents and extracted attachment contents using OpenAI Embeddings.. Stores the embeddings in the Milvus Vector Database for efficient semantic search and retrieval.
+6. Uses the on-device Microsoft Phi-3 128k-instruct LLM model to categorize emails intelligently. Stores the categorized information of each email in Amazon RDS for easy filtering and prioritization.
+
 
 ## FastAPI
 Acts as the backend service to integrate Milvis, Langraph agents, and the user interface.
-Provide endpoints for sign in, getting access token, mail exploration, querying etc.
+Provide endpoints for sign-in, getting access tokens, mail exploration, querying, etc.
 
 ## LangGraph (Agents):
 Prompt Correction Agent: This agent takes the user’s prompt and passes it through a Large Language Model (LLM), which then rewrites the prompt to improve clarity and specificity for better results. To simplify the process, human approval for the regenerated prompt is skipped.
@@ -43,7 +50,7 @@ Summarization Agent: This agent analyzes the content of an entire email thread i
 Response Agent: This agent processes the user’s response, generates a well-structured email, identifies the appropriate recipients, and automatically sends the email on behalf of the user.
 
 ## Streamlit
-The Streamlit application provides an intuitive and interactive interface for users to explore their categorized mail, generate summaries for threads of mail, have a chatbot interaction with your mailbox, and also automate responses through it. It also provides a speech-to-text and text-to-speech feature for people with accessibility issues.
+The Streamlit application provides an intuitive and interactive interface for users to explore their categorized mail, generate summaries for threads of mail, have a chatbot interaction with their mailbox, and also automate responses through it. It also provides a speech-to-text and text-to-speech feature for people with accessibility issues.
 
 ## Architecture Diagrams
 
@@ -90,6 +97,7 @@ pip install -r requirements.txt
 8. Milvus Vector Database - Stores and retrieves high-dimensional vector embeddings for efficient similarity searches
 9. Amazon S3 - Serves as a scalable storage solution for raw files and processed data in the pipeline
 10. Microsoft Graph API - Facilitates seamless interaction with Microsoft 365 services for email management and data access
+11. Streamlit - A web application framework used to create a user-friendly interface.
 
 ## Project Structure
 
