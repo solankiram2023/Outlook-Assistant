@@ -1,6 +1,7 @@
 import requests
 import logging
 import boto3
+import os
 from typing import Dict, Any
 from datetime import datetime
 from botocore.exceptions import ClientError
@@ -8,9 +9,9 @@ from botocore.exceptions import ClientError
 logger = logging.getLogger(__name__)
 
 class EmailService:
-    def __init__(self, base_url: str = 'http://127.0.0.1:5000'):
+    def __init__(self):
         """Initialize EmailService with optional base URL."""
-        self.base_url = base_url
+        self.base_url = os.getenv("FASTAPI_URL")
         self.s3_client = boto3.client('s3')
         logger.info(f"EmailService initialized with base URL: {self.base_url}")
     
@@ -18,7 +19,7 @@ class EmailService:
         """Fetch all emails from the API."""
         try:
             logger.info("Fetching emails from API...")
-            response = requests.get(f"{self.base_url}/fetch_emails/{folder}")
+            response = requests.get(f"{self.base_url}/{os.getenv("FETCH_MAILS_ENDPOINT")}/{folder}")
             response.raise_for_status()
             data = response.json()
             logger.info(f"Successfully fetched {len(data.get('data', []))} emails")
@@ -72,7 +73,7 @@ class EmailService:
         """Load specific email details with S3 attachment information."""
         try:
             logger.info(f"Loading email details for ID: {email_id}")
-            response = requests.get(f"{self.base_url}/load_email/{email_id}")
+            response = requests.get(f"{self.base_url}/{os.getenv("LOAD_MAILS_ENDPOINT")}/{email_id}")
             response.raise_for_status()
             data = response.json()
             
@@ -118,3 +119,35 @@ class EmailService:
         except Exception as e:
             logger.error(f"Error loading attachments for email {email_id}: {str(e)}")
             return []
+        
+    def get_email_category(self, email_id: str) -> Dict[str, Any]:
+        """Load email category for a specific mail id"""
+        try:
+            logger.info(f"Loading email category for ID: {email_id}")
+            response = requests.get(f"{self.base_url}/{os.getenv('LOAD_CATEGORY_ENDPOINT')}/{email_id}")
+            response.raise_for_status()
+            data = response.json()
+            
+            # Return the data directly since it already contains the categories in the format we want
+            if data["status"] == 200 and isinstance(data.get("data"), list):
+                return {
+                    "status": data["status"],
+                    "data": data["data"],  # This will be the list of categories
+                    "message": data.get("message", "Email categories loaded successfully")
+                }
+            
+            # If response format is unexpected, return empty list
+            logger.warning(f"Unexpected response format for email categories: {data}")
+            return {
+                "status": 200,
+                "data": [],
+                "message": "No categories found"
+            }
+                
+        except requests.RequestException as e:
+            logger.error(f"Error loading categories for email {email_id}: {str(e)}")
+            return {
+                "status": 500,
+                "message": f"Failed to load categories for email {email_id}",
+                "data": []
+            }
