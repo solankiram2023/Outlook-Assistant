@@ -56,6 +56,7 @@ Ramy Solanki         | 002816593 | 33% | JWT Implementation, DB Schema
 [![Microsoft Azure](https://img.shields.io/badge/Microsoft%20Azure-0089D6?style=for-the-badge&logo=microsoftazure&logoColor=white)](https://azure.microsoft.com/)
 [![Microsoft Phi-3](https://img.shields.io/badge/Microsoft%20Phi--3-005A9C?style=for-the-badge&logo=microsoft&logoColor=white)](https://www.microsoft.com/)
 [![Ollama](https://img.shields.io/badge/Ollama-FF3366?style=for-the-badge&logo=llama&logoColor=white)](https://ollama.ai/)
+[![SQL](https://img.shields.io/badge/SQL-4479A1?style=for-the-badge&logo=postgresql&logoColor=white)](https://en.wikipedia.org/wiki/SQL)
 
 
 ## Prerequisites
@@ -65,3 +66,4 @@ Ramy Solanki         | 002816593 | 33% | JWT Implementation, DB Schema
 
 
 ## How to run the application locally
+
