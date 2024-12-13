@@ -9,6 +9,7 @@ from utils.logs import start_logger
 from database.connection import open_connection, close_connection
 from agents.summary_agent import SummarizeEmailThread
 from agents.response_agent import RespondToEmailBasedOnUserPrompt
+from datetime import datetime
 
 # Logging
 logger = start_logger()
@@ -90,7 +91,7 @@ def fetch_email_from_postgres(email_id):
                     "email_id"         : result[0],
                     "subject"          : result[1],
                     "body"             : result[2],
-                    "sent_datetime"    : result[3],
+                    "sent_datetime"    : result[3].strftime('%Y-%m-%d %H:%M:%S'),
                     "reply_to_name"    : reply_to_name,
                     "reply_to_address" : reply_to_address,
                     "sender_id"        : result[5],
