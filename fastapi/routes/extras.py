@@ -4,7 +4,7 @@ from utils.variables import load_env_vars
 from fastapi.responses import JSONResponse
 from auth.authenticate import refresh_access_tokens, is_token_valid
 from database.jobs import dequeue_job, trigger_airflow, delete_failed_jobs, fetch_user_via_job
-from utils.services import fetch_emails, load_email, get_email_category
+from utils.services import fetch_emails, load_email, get_email_category, send_mail_response
 from agents.controller import process_input
 from pydantic import BaseModel
 from typing import Dict
@@ -216,3 +216,23 @@ async def chatbot_handler(user_data: RequestData):
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             content     = {}
         )
+    
+
+# Route to send email
+@router.post(
+    path        = env["SEND_MAIL_ENDPOINT"],
+    name        = "Send Email",
+    description = "Endpoint to send a post request to send email response",
+    tags        = ["Emails"]
+)
+def send_email_endpoint(user_email: str, response_output):
+
+    logger.info(f"ROUTES/EXTRAS - send_email_endpoint() - POST /send_email/ Request send an email")
+
+    response = send_mail_response(user_email, response_output)
+
+    # Return the dictionary as a JSONResponse
+    return JSONResponse(
+        status_code = response["status"],
+        content     = response
+    )
