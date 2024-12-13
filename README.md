@@ -52,7 +52,7 @@ The Streamlit application provides an intuitive and interactive interface for us
 
 
 ### 2. Core Application
-
+![Architecture Diagram](https://github.com/BigDataIA-Fall2024-TeamB6/FinalProject/blob/main/diagrams/Corepipeline.png)
 
 ## Technologies
 [![Python](https://img.shields.io/badge/Python-FFD43B?style=for-the-badge&logo=python&logoColor=blue)](https://www.python.org/)
