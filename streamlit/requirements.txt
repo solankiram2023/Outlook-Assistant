@@ -6,3 +6,4 @@ pydub
 streamlit-quill
 audio-recorder-streamlit
 streamlit-chat
+boto3
