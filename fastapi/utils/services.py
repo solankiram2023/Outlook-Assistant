@@ -316,15 +316,15 @@ def send_mail_response(user_email, response_output):
 
             email_body = {
                 "message": {
-                    "subject": response_output["subject"],
+                    "subject": response_output['subject'],
                     "body": {
                         "contentType": "HTML",
-                        "content": response_output["body"]
+                        "content": response_output['body']
                     },
                     "toRecipients": [
                         {
                             "emailAddress": {
-                                "address": response_output["recipient_email"]
+                                "address": response_output['recipient_email']
                             }
                         }
                     ]
@@ -342,7 +342,7 @@ def send_mail_response(user_email, response_output):
             )
 
             if response.status_code == 202:
-                logger.info(f"Email sent successfully to {response_output["recipient_email"]}")
+                logger.info(f"Email sent successfully to {response_output['recipient_email']}")
                 response = {
                     "status": status.HTTP_200_OK,
                     "data": True,

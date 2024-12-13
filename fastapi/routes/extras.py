@@ -177,7 +177,7 @@ def get_category_endpoint(email_id: str):
 async def chatbot_handler(user_data: RequestData):
     """ Interact with LangGraph Agents via the chatbot interface """
 
-    logger.info(f"ROUTES/EXTRAS - chatbot_handler() - GET {env["CHAT_ENDPOINT"]} Starting chatbot")
+    logger.info(f"ROUTES/EXTRAS - chatbot_handler() - GET {env['CHAT_ENDPOINT']} Starting chatbot")
 
     user_data = user_data.model_dump()
 
@@ -190,7 +190,7 @@ async def chatbot_handler(user_data: RequestData):
     )
 
     try:
-        logger.info(f"ROUTES/EXTRAS - chatbot_handler() - GET {env["CHAT_ENDPOINT"]} Starting chatbot")
+        logger.info(f"ROUTES/EXTRAS - chatbot_handler() - GET {env['CHAT_ENDPOINT']} Starting chatbot")
 
         response_data = {
             "current_input"        : result.get("current_input", None),
