@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Request, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.responses import JSONResponse
+import os
 
 from utils.logs import start_logger
 from utils.variables import load_env_vars
 from auth.authenticate import request_auth_token, request_access_tokens, refresh_access_tokens
+from dotenv import load_dotenv
+import urllib.parse
 
 # Start the router
 router  = APIRouter()
@@ -14,6 +17,8 @@ logger = start_logger()
 
 # Load env
 env = load_env_vars()
+
+load_dotenv()
 
 @router.get(
     path        = env['SIGN_IN_ENDPOINT'],
@@ -54,14 +59,26 @@ def auth_callback(request: Request):
         if auth_dict is not None:
             logger.info(f"ROUTES/AUTH - auth_callback() - Access tokens received")
             
-            return JSONResponse(
-                status_code = status.HTTP_200_OK,
-                content     = {
-                    "status"    : status.HTTP_200_OK,
-                    "type"      : "json",
-                    "message"   : auth_dict
-                }
-            )
+            # return JSONResponse(
+            #     status_code = status.HTTP_200_OK,
+            #     content     = {
+            #         "status"    : status.HTTP_200_OK,
+            #         "type"      : "json",
+            #         "message"   : auth_dict
+            #     }
+            # )
+
+            parameters = {
+                "access_token"       : auth_dict["access_token"],
+                "name"               : auth_dict["id_token_claims"]["name"],
+                "preferred_username" : auth_dict["id_token_claims"]["preferred_username"]
+            }
+
+            query_string = urllib.parse.urlencode(parameters)
+
+            streamlit_redirect_url= "http://" + os.getenv("STREAMLIT_HOST") + ":" + os.getenv("STREAMLIT_PORT") + "/?" + query_string
+
+            return RedirectResponse(url=streamlit_redirect_url)
 
     logger.info(f"ROUTES/AUTH - auth_callback() - Failed to fetch access tokens")
     return JSONResponse(
