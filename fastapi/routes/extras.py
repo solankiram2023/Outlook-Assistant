@@ -4,7 +4,7 @@ from utils.variables import load_env_vars
 from fastapi.responses import JSONResponse
 from auth.authenticate import refresh_access_tokens, is_token_valid
 from database.jobs import dequeue_job, trigger_airflow, delete_failed_jobs, fetch_user_via_job
-from utils.services import fetch_emails, load_email
+from utils.services import fetch_emails, load_email, get_email_category
 
 # Start the router
 router  = APIRouter()
@@ -127,6 +127,26 @@ def load_email_endpoint(email_id: str):
     logger.info(f"ROUTES/EMAILS - load_email_endpoint() - GET /load_email/{email_id} Request to load email details")
 
     response = load_email(email_id)
+
+    # Return the dictionary as a JSONResponse
+    return JSONResponse(
+        status_code = response["status"],
+        content     = response
+    )
+
+
+# Router to load an email
+@router.get(
+    path        = env["LOAD_CATEGORY_ENDPOINT"] + "/{email_id}",
+    name        = "Get Category",
+    description = "Endpoint to get category by email ID",
+    tags        = ["Emails"]
+)
+def get_category_endpoint(email_id: str):
+
+    logger.info(f"ROUTES/EMAILS - get_category_endpoint() - GET /get_category/{email_id} Request to get email category")
+
+    response = get_email_category(email_id)
 
     # Return the dictionary as a JSONResponse
     return JSONResponse(
