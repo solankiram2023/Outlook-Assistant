@@ -559,7 +559,12 @@ def render_chat_window():
             "role": "user", 
             "content": user_question
         })
-        response = f"This is a response to: {user_question}"
+        response = email_service.send_user_prompt(
+            st.session_state["preferred_username"], 
+            user_question, 
+            st.session_state.selected_email_id
+        )
+        logger.info(f"Response from the chat window: {response}")
         st.session_state.messages.append({
             "role": "assistant",
             "content": response
