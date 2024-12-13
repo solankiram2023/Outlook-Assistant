@@ -331,7 +331,7 @@ def RespondToEmailNode(state: AgentState):
             "recipient_email"   : state["email_context"].get("recipient_email", None),
             "recipient_name"    : state["email_context"].get("recipient_name", None),
             "subject"           : result["subject"],
-            "body"              : result["plain_text"],
+            "body"              : result["html_content"],
         }
 
     else:
