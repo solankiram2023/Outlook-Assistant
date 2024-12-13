@@ -106,7 +106,7 @@ async def process_input(
     email_context   : Optional[Dict] = None,
     message_history : Optional[List[BaseMessage]] = None,
 ) -> Dict:
-    """Process user input through the workflow."""
+    """ Process user input through the workflow """
     
     initial_state = AgentState(
         messages             = message_history or [],
@@ -117,14 +117,19 @@ async def process_input(
         rag_status           = None,
         rag_response         = None,
         conversation_summary = None,
-        response_output      = {}
+        response_output      = None
     )
     
     final_state = await graph.ainvoke(initial_state, config=config_dict)
-    
-    # return {
-    #     "corrected_prompt": final_state.get("corrected_prompt", None),
-    # }
 
-    return final_state
+    return {
+        "current_input"        : final_state.get("current_input", None),
+        "email_context"        : final_state.get("email_context", None),
+        "user_email"           : final_state.get("user_email", None),
+        "corrected_prompt"     : final_state.get("corrected_prompt", None),
+        "rag_status"           : final_state.get("rag_status", None),
+        "rag_response"         : final_state.get("rag_response", None),
+        "conversation_summary" : final_state.get("conversation_summary", None),
+        "response_output"      : final_state.get("response_output", None)
+    }
 
