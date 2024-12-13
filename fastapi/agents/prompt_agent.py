@@ -1,13 +1,14 @@
 import json
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
-from typing import Union, Annotated, Optional, Dict, cast
+from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
 from langchain.tools import tool
 
 from agents.state import AgentState
 from utils.variables import load_env_vars
 from utils.logs import start_logger
 from database.connection import open_connection, close_connection
+from agents.summary_agent import SummarizeEmailThread
+from agents.response_agent import RespondToEmailBasedOnUserPrompt
 
 # Logging
 logger = start_logger()
@@ -31,14 +32,6 @@ def RetrieveFromMilvusVectorStore():
 def DecideNextStep():
     """ After fetching the email context, decide whether to call the RAG agent or Response Agent """
 
-@tool
-def SummarizeEmailThread():
-    """ Generate a summary for the entire email thread """
-
-@tool
-def RespondToEmailBasedOnUserPrompt():
-    """ Respond to an email based on the user's input, and provided email context (if any) """
-
 
 def fetch_email_from_postgres(email_id):
     """ Fetch email data from Postgres to send to LLM """
@@ -56,10 +49,12 @@ def fetch_email_from_postgres(email_id):
     
     try:
         email_fetch_query = """
-            SELECT emails.id, emails.subject, emails.body, emails.sent_datetime, senders.id, senders.name, senders.email_address
+            SELECT emails.id, emails.subject, emails.body, emails.sent_datetime, emails.reply_to, senders.id, senders.name, senders.email_address, recipients.name, recipients.email_address
             FROM emails
             JOIN senders
             ON emails.id = senders.email_id
+            JOIN recipients
+            ON emails.id = recipients.email_id
             WHERE emails.id = %s
             LIMIT 1;
         """
@@ -69,14 +64,40 @@ def fetch_email_from_postgres(email_id):
             result = cursor.fetchone()
 
             if result:
+
+                reply_to = result[4] 
+                reply_to_name = None
+                reply_to_address = None
+
+                if reply_to:
+                    try:
+                        
+                        reply_to_list = json.loads(reply_to)
+                        if reply_to_list:
+
+                            first_reply_to = reply_to_list[0].get("emailAddress")
+                            if first_reply_to:
+                                
+                                first_reply_to_data = eval(first_reply_to)
+                                reply_to_name = first_reply_to_data.get("name")
+                                reply_to_address = first_reply_to_data.get("address")
+                    
+                    except Exception as exception:
+                        logger.warning(f"AGENTS/PROMPT_AGENT - fetch_email_from_postgres() - Failed to parse reply_to: {exception}")
+
+
                 email_context = {
-                    "email_id"      : result[0],
-                    "subject"       : result[1],
-                    "body"          : result[2],
-                    "sent_datetime" : result[3],
-                    "sender_id"     : result[4],
-                    "sender_name"   : result[5],
-                    "sender_email"  : result[6],
+                    "email_id"         : result[0],
+                    "subject"          : result[1],
+                    "body"             : result[2],
+                    "sent_datetime"    : result[3],
+                    "reply_to_name"    : reply_to_name,
+                    "reply_to_address" : reply_to_address,
+                    "sender_id"        : result[5],
+                    "sender_name"      : result[6],
+                    "sender_email"     : result[7],
+                    "recipient_name"   : result[8],
+                    "recipient_email"  : result[9],
                 }
 
                 result = email_context
@@ -185,7 +206,6 @@ async def DecideNextStepNode(state: AgentState):
     result = await model.bind_tools(
         [
             GeneratePromptForRAG,
-            SummarizeEmailThread,
             RespondToEmailBasedOnUserPrompt
         ],
         **ainvoke_kwargs
@@ -196,7 +216,6 @@ async def DecideNextStepNode(state: AgentState):
                 
                 If the user wants to:
                 - Find similar emails: Use GeneratePromptForRAG
-                - Get a summary: Use SummarizeEmailThread
                 - Respond to the email: Use RespondToEmailBasedOnUserPrompt
                 
                 User's Request: {state['current_input']}
@@ -253,33 +272,47 @@ async def GeneratePromptForRagNode(state: AgentState):
             api_key     = env["OPENAI_API_KEY"]
         )
 
-        rag_prompt_system = """
+        rag_prompt_system = f"""
             You are an AI assistant that helps generate optimal query string for vector similarity search.
-            Given an email's context and a user's query, create a search string that will help find similar emails.
-            Focus on key aspects like:
-            1. The email's main topic and subject
-            2. Key points from the email body
-            3. The intent of the user's query
-            
-            Format the prompt to emphasize semantic similarity rather than exact keyword matching.
-            Note that the string you generate will be directly used in vector database to find similar content. 
+            Given an email's context and/or a user's query, create a search string that will help find similar emails.
         """
 
-        result = await model.ainvoke([
-            SystemMessage(content=rag_prompt_system),
-            HumanMessage(content=f"""
-                Generate an optimized search string based on:
-                
+        if email_context.get('subject', None):
+            rag_prompt_system += f"""
+                Given an email's context and a user's query, create a search string that will help find similar emails.
+
+                Focus on key aspects like:
+                1. The email's main topic and subject
+                2. Key points from the email body
+                3. The intent of the user's query
+
                 User Query: {state['current_input']}
-                
+                    
                 Email Context:
                 Subject: {email_context.get('subject', 'N/A')}
                 Body: {email_context.get('body', 'N/A')}
                 Sender: {email_context.get('sender_name', 'N/A')}
+            """
+            
+        else:
+            rag_prompt_system += f"""
+                Given a user's query, create a search string that will help find similar emails.
+
+                Focus on key aspects like:
+                1. The intent of the user's query.
                 
-                Generate a query string that will help find semantically similar emails.
-                You must respond only with the prompt and nothing else.
-            """)
+                User Query: {state['current_input']}
+            """
+        rag_prompt_system += f"""
+            Format the prompt to emphasize semantic similarity rather than exact keyword matching.
+            Note that the string you generate will be directly used in vector database to find similar content. 
+
+            Generate an optimized search string that will help find semantically similar emails.
+            You must respond only with the optimized search string and nothing else.
+        """
+
+        result = await model.ainvoke([
+            SystemMessage(content=rag_prompt_system),
         ])
 
         # Store the corrected prompt
@@ -307,16 +340,6 @@ async def GeneratePromptForRagNode(state: AgentState):
     
     return state
 
-
-async def SummarizeEmailThreadNode(state: AgentState):
-    """ Generate a summary for the entire email thread """
-    # Do not generate code for SummarizeEmailThreadNode at the moment
-
-
-async def RespondToEmailNode(state: AgentState):
-    """ Respond to an email based on the user's input, and provided email context (if any) """
-    # Do not generate code for RespondToEmailBasedOnUserPrompt at the moment
-
 async def StartNode(state: AgentState):
     """ Entry point for LangGraph graph """
 
@@ -333,7 +356,6 @@ async def StartNode(state: AgentState):
         [
             GetEmailContext, 
             GeneratePromptForRAG, 
-            RetrieveFromMilvusVectorStore, 
             SummarizeEmailThread
         ],
         **ainvoke_kwargs
@@ -341,9 +363,13 @@ async def StartNode(state: AgentState):
         SystemMessage(
             content = f"""
                 You are a helpful AI assistant. Your job is to call the provided tools. 
-                The user's input is provided in the Input field below, along with the email context.
-                If the Email Context contains only the 'email_id' then you must call the email context tool to fetch details of the email.
-                
+                The user's input is provided in the Input field below, along with the email context if available.
+                If user's input is about summary or summarization, then call the summarization tool (Presence of 'email_id' is mandatory for calling this tool).
+                If the user's input is about similarity or something similar, call the generate prompt tool (Presence of 'email_id' is optional for calling this tool).
+
+                If the Email Context contains only the 'email_id' then you must call the email context tool to fetch details of the email before you call any other tool (Presence of 'email_id' is mandatory for calling this tool).
+                if 'email_id' is missing, simply call the generate prompt tool.
+
                 Input: {state['current_input']}
                 Email Context: {json.dumps(state.get('email_context', {}))}
             """
