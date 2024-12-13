@@ -19,18 +19,18 @@ load_dotenv()
 
 query_params = st.query_params
 
-token = query_params.get("access_token", None)
-name = query_params.get("name", None)
-preferred_username = query_params.get("preferred_username", None)
+# token = query_params.get("access_token", None)
+# name = query_params.get("name", None)
+# preferred_username = query_params.get("preferred_username", None)
 
-if "access_token" not in st.session_state:
-    st.session_state["access_token"] = token
+# if "access_token" not in st.session_state:
+#     st.session_state["access_token"] = token
 
-if "name" not in st.session_state:
-    st.session_state["name"] = name
+# if "name" not in st.session_state:
+#     st.session_state["name"] = name
 
-if "preferred_username" not in st.session_state:
-    st.session_state["preferred_username"] = preferred_username
+# if "preferred_username" not in st.session_state:
+#     st.session_state["preferred_username"] = preferred_username
 
 # Initialize EmailService
 email_service = EmailService()

@@ -11,6 +11,22 @@ email_service = EmailService()
 
 st.set_page_config(layout="wide")
 
+query_params = st.query_params
+
+token = query_params.get("access_token", None)
+name = query_params.get("name", None)
+preferred_username = query_params.get("preferred_username", None)
+
+if "access_token" not in st.session_state:
+    st.session_state["access_token"] = token
+
+if "name" not in st.session_state:
+    st.session_state["name"] = name
+
+if "preferred_username" not in st.session_state:
+    st.session_state["preferred_username"] = preferred_username
+
+
 # Custom CSS
 with open("style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -18,6 +34,10 @@ with open("style.css") as f:
 # Initialize session state for selected folder
 if 'selected_folder' not in st.session_state:
     st.session_state.selected_folder = 'Inbox'  # Default folder
+
+# Initialize session states
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
 
 def get_folder_count(folder_name):
     """Get the count of emails in a folder"""
@@ -60,36 +80,34 @@ def render_sidebar():
                     st.markdown(f"<div class='folder-count'>{count}</div>", unsafe_allow_html=True)
 
 def sign_in_page():
-    col1, col2 = st.columns([6, 1])
+    # Use full width for the sign-in page
+    st.title("Outlook Email Management Assistant")
     
-    with col1:
-        st.title("Outlook Email Management Assistant")
+    col1, col2, col3 = st.columns([3, 2, 3])
     
     with col2:
-        if st.button("Sign In"):
+        if st.button("Sign In with Microsoft", type="primary", use_container_width=True):
             try:
                 base_url = os.getenv("FASTAPI_URL")
                 sign_in_url = f"{base_url}{os.getenv('SIGN_IN_ENDPOINT')}"
-                webbrowser.open(sign_in_url)
+                # Open in the same tab
+                js = f"""
+                <script>
+                    window.location.href = "{sign_in_url}";
+                </script>
+                """
+                st.components.v1.html(js, height=0)
                 st.session_state.authenticated = True
-                st.rerun()
             except Exception as e:
                 st.error(f"Error connecting to authentication server: {str(e)}")
 
-def check_authentication():
-    """Check if user is authenticated with the email service"""
-    try:
-        # Test authentication by trying to fetch emails
-        response = email_service.fetch_emails(folder="Inbox")
-        return response["status"] == 200
-    except Exception:
-        return False
-
-if __name__ == "__main__":
+def main():
     # Check authentication status
-    if not check_authentication():
+    if not st.session_state.authenticated:
         sign_in_page()
     else:
-        st.session_state.authenticated = True
         render_sidebar()
         render_mailbox()
+
+if __name__ == "__main__":
+    main()
