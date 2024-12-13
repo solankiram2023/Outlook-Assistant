@@ -1,16 +1,18 @@
 # --- This is the main entry point for the AI ---
 # --- It defines the workflow graph and the entry point for the agent ---
 
-import json
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
-from typing import Dict, List, Optional, Union, cast
+from typing import Dict, List, Optional, cast
 from langchain_core.messages import AIMessage, ToolMessage, BaseMessage
 
 from agents.state import AgentState
 
 # Node imports
-from agents.prompt_agent import StartNode, GetEmailContextNode, DecideNextStepNode, GeneratePromptForRagNode, SummarizeEmailThreadNode, RespondToEmailNode
+from agents.prompt_agent import StartNode, GetEmailContextNode, DecideNextStepNode, GeneratePromptForRagNode
+from agents.rag_agent import RagAgentNode
+from agents.summary_agent import SummarizeEmailThreadNode
+from agents.response_agent import RespondToEmailNode
 
 from utils.variables import load_env_vars
 from utils.logs import start_logger
@@ -30,8 +32,9 @@ workflow.add_node("start_node", StartNode)
 workflow.add_node("get_email_context", GetEmailContextNode)
 workflow.add_node("generate_rag_prompt", GeneratePromptForRagNode)
 workflow.add_node("summarize_thread", SummarizeEmailThreadNode)
-workflow.add_node("respond_to_email", RespondToEmailNode)
 workflow.add_node("decide_next_step", DecideNextStepNode)
+workflow.add_node("rag_agent", RagAgentNode)
+workflow.add_node("respond_to_email", RespondToEmailNode)
 
 def route(state):
     """ Route to determine the next node to call """
@@ -55,6 +58,9 @@ def route(state):
             elif tool_name == "SummarizeEmailThread":
                 return "summarize_thread"
             
+            elif tool_name == "RespondToEmailBasedOnUserPrompt":
+                return "respond_to_email"
+            
     if isinstance(messages[-1], ToolMessage):
         if len(messages) >= 2:
             
@@ -64,7 +70,6 @@ def route(state):
                 previous_message.tool_calls and 
                 previous_message.tool_calls[0]["name"] == "GetEmailContext"
             ):
-                print("REACHED HERE")
                 return "decide_next_step"
     
     return END
@@ -80,12 +85,13 @@ config_dict = {
 
 # Connect nodes
 workflow.set_entry_point("start_node")
-workflow.add_conditional_edges("start_node", route, ["get_email_context", "summarize_thread", END])
+workflow.add_conditional_edges("start_node", route, ["get_email_context", "generate_rag_prompt", "summarize_thread", END])
 workflow.add_conditional_edges("get_email_context", route, ["decide_next_step", END])
-workflow.add_conditional_edges("decide_next_step", route, ["generate_rag_prompt", "summarize_thread", "respond_to_email", END])
+workflow.add_conditional_edges("decide_next_step", route, ["generate_rag_prompt", "respond_to_email", END])
 
 # Attach RAG agent to this node
-workflow.add_conditional_edges("generate_rag_prompt", route, [END])
+workflow.add_edge("generate_rag_prompt", "rag_agent")
+workflow.add_edge("rag_agent", END)
 
 workflow.add_edge("summarize_thread", END)
 workflow.add_edge("respond_to_email", END)
@@ -95,17 +101,23 @@ graph = workflow.compile(checkpointer=memory)
 
 
 async def process_input(
-    user_input: str,
-    email_context: Optional[Dict] = None,
-    message_history: Optional[List[BaseMessage]] = None,
+    user_input      : str,
+    user_email      : Optional[str],
+    email_context   : Optional[Dict] = None,
+    message_history : Optional[List[BaseMessage]] = None,
 ) -> Dict:
     """Process user input through the workflow."""
     
     initial_state = AgentState(
-        messages         = message_history or [],
-        current_input    = user_input,
-        email_context    = email_context or {},
-        corrected_prompt = None,
+        messages             = message_history or [],
+        current_input        = user_input,
+        email_context        = email_context or {},
+        user_email           = user_email or None,
+        corrected_prompt     = None,
+        rag_status           = None,
+        rag_response         = None,
+        conversation_summary = None,
+        response_output      = {}
     )
     
     final_state = await graph.ainvoke(initial_state, config=config_dict)
@@ -116,17 +128,3 @@ async def process_input(
 
     return final_state
 
-
-if __name__ == "__main__":
-    import asyncio
-    
-    async def main():
-        result = await process_input(
-            user_input="Can you show me emails similar to this one?",
-            email_context={
-                "email_id": "AAMkADAwNDhkZDI3LThlODMtNDNkNy04ZGRjLWQwN2I1N2UxNjAyMABGAAAAAACDoa9wVVCtSYVLL53u_ueBBwBQwg2UQmqmTYVgJHd2DKqdAAAAAAEMAABQwg2UQmqmTYVgJHd2DKqdAAGAhattAAA="
-            }
-        )
-        print(result)
-    
-    asyncio.run(main())
