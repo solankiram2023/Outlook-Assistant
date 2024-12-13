@@ -1,8 +1,12 @@
-# FinalProject
+# Outlook Assistant
+
+## Overview
+The Outlook Email Management Assistant enables users to efficiently manage their inboxes by leveraging OpenAI, Retrieval-Augmented Generation (RAG), natural language processing, and automation to streamline email management. It focuses on simplifying email management with features like query-based email interaction, email summarization, categorization, automatic responses to the emails, real-time translation, and audio transcription for accessibility. By automating these tasks, this tool will help users save time, improve productivity, reduce email overload, and ensure they never miss crucial communications, all while enhancing accessibility for users with different needs.
+
+## Application Link
 
 
-## Outlook Email Management Assistant
-The goal of this project is to develop an Outlook Email Management Assistant that leverages Retrieval-Augmented Generation (RAG), AI, natural language processing, and automation to streamline email management. The assistant will enable users to efficiently manage their inboxes by providing features such as query-based email interaction, automatic email summarization, real-time translation, and audio transcription for accessibility. It will also categorize emails intelligently and retrieve important messages that may be missed. By automating these tasks, this tool will help users save time, improve productivity, reduce email overload, and ensure they never miss crucial communications, all while enhancing accessibility for users with different needs.
+## Codelabs Documentation 
 
 ## Problem Statement
 Managing an email inbox has become increasingly difficult due to the overwhelming volume of emails many users receive daily, leading to challenges in prioritizing and responding to important messages. Important emails can easily get lost in the clutter, and manual efforts to sort, prioritize, and respond to emails take up valuable time. Additionally, emails may be missed if they end up in junk folders, or users might overlook key information in long threads. For individuals with accessibility needs, reading and processing email content can also pose challenges. These issues highlight the need for an intelligent, automated system that can help users manage their inboxes more efficiently, prioritize critical communications, and improve accessibility.
