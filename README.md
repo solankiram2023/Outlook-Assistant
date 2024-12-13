@@ -49,7 +49,7 @@ The Streamlit application provides an intuitive and interactive interface for us
 
 ### 1. Airflow Pipeline
 
-
+![Architecture Diagram](https://github.com/BigDataIA-Fall2024-TeamB6/FinalProject/blob/main/diagrams/airflowpipeline.png)
 
 ### 2. Core Application
 ![Architecture Diagram](https://github.com/BigDataIA-Fall2024-TeamB6/FinalProject/blob/main/diagrams/Corepipeline.png)
@@ -77,6 +77,19 @@ The Streamlit application provides an intuitive and interactive interface for us
 
 ## Prerequisites
 
+Software Installations required for the project
+1. Python Environment
+   A Python environment allows you to create isolated spaces for your Python projects, managing dependencies and versions separately
+2. Packages
+```bash
+pip install -r requirements.txt
+```
+3. Apache Airflow - Orchestrates the data pipeline, enabling automated workflows for data processing and integration
+4. Docker - provides a containerized environment to ensure consistent deployment and scalability of the application
+6. Amazon RDS (PostgreSQL) - Manages relational data storage and retrieval with high availability and scalability
+8. Milvus Vector Database - Stores and retrieves high-dimensional vector embeddings for efficient similarity searches
+9. Amazon S3 - Serves as a scalable storage solution for raw files and processed data in the pipeline
+10. Microsoft Graph API - Facilitates seamless interaction with Microsoft 365 services for email management and data access
 
 ## Project Structure
 
