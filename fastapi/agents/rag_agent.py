@@ -1,42 +1,44 @@
 import os
 import json
-import logging
-from typing import List, Dict, Optional
+from typing import List, Dict
 from dotenv import load_dotenv
 from langchain_milvus import Milvus
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_core.runnables import RunnablePassthrough, ConfigurableField
+from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
+from agents.state import AgentState
+
+from utils.logs import start_logger
 
 # Load environment variables
 load_dotenv()
 
+# Logging
+logger = start_logger()
+
 class EmailRAGAgent:
-    def __init__(self, logger, user_email: str):
-        """
-        Initialize the RAG agent with LangChain components
-        Args:
-            logger: Logger instance
-            user_email: User's email to determine collection name
-        """
-        self.logger = logger
+    def __init__(self, user_email: str):
+        """ Initialize the RAG agent """
+        
+        logger.info(f"AGENTS/RAG_AGENT - init() - Setting up RAG agent")
+
         self.user_email = user_email
         self.email_collection = self._format_collection_name(user_email)
         self.attachment_collection = f"{self.email_collection}_attachments"
         
         # Match the embeddings model with your existing setup
         self.embeddings = OpenAIEmbeddings(
-            model=os.getenv("EMBEDDING_MODEL"),
-            openai_api_key=os.getenv("OPENAI_API_KEY"),
-            dimensions=3072
+            model       = os.getenv("EMBEDDING_MODEL"),
+            api_key     = os.getenv("OPENAI_API_KEY"),
+            dimensions  = 3072
         )
         
         self.llm = ChatOpenAI(
-            model_name="gpt-4o-mini",
-            temperature=0,
-            openai_api_key=os.getenv("OPENAI_API_KEY")
+            model_name  = "gpt-4o-mini",
+            temperature = 0,
+            api_key     = os.getenv("OPENAI_API_KEY")
         )
 
         self.email_vectorstore = None
@@ -44,51 +46,61 @@ class EmailRAGAgent:
         self._initialize_vectorstore()
         self._setup_rag_chain()
 
+        logger.info(f"AGENTS/RAG_AGENT - init() - Setup complete")
+
     def _format_collection_name(self, email: str) -> str:
-        """Format email address for collection name"""
+        """ Format email address for collection name """
+
+        logger.info(f"AGENTS/RAG_AGENT - _format_collection_name() - Converting email address to vector store name")
+        
         return email.replace('@', os.getenv("__AT")).replace('.', os.getenv("__PERIOD"))
 
     def _initialize_vectorstore(self):
         """Initialize connection to Milvus vector store"""
+        
+        logger.info(f"AGENTS/RAG_AGENT - _initialize_vectorstore() - Setting up connection parameters for Milvus vector store server")
+        
         try:
             connection_args = {
-                "uri": f"http://{os.getenv('MILVUS_HOST')}:{os.getenv('MILVUS_PORT')}",
-                "user": os.getenv("MILVUS_USER"),
-                "password": os.getenv("MILVUS_PASSWORD"),
-                "db_name": os.getenv("MILVUS_DATABASE")
+                "uri"       : f"http://{os.getenv('MILVUS_HOST')}:{os.getenv('MILVUS_PORT')}",
+                "user"      : os.getenv("MILVUS_USER"),
+                "password"  : os.getenv("MILVUS_PASSWORD"),
+                "db_name"   : os.getenv("MILVUS_DATABASE")
             }
 
             # Initialize email vectorstore
             self.email_vectorstore = Milvus(
-                embedding_function=self.embeddings,
-                collection_name=self.email_collection,
-                connection_args=connection_args,
-                vector_field="embedding",
-                text_field = "page_content"
+                embedding_function  = self.embeddings,
+                collection_name     = self.email_collection,
+                connection_args     = connection_args,
+                vector_field        = "embedding",
+                text_field          = "page_content"
             )
-            self.logger.info(f"Connected to email collection: {self.email_collection}")
+            logger.info(f"AGENTS/RAG_AGENT - _initialize_vectorstore() - Setting up parameters for email collection: {self.email_collection}")
 
             # Initialize attachment vectorstore
             self.attachment_vectorstore = Milvus(
-                embedding_function=self.embeddings,
-                collection_name=self.attachment_collection,
-                connection_args=connection_args,
-                vector_field="embedding",
-                text_field = "page_content"
+                embedding_function  = self.embeddings,
+                collection_name     = self.attachment_collection,
+                connection_args     = connection_args,
+                vector_field        = "embedding",
+                text_field          = "page_content"
             )
-            self.logger.info(f"Connected to attachment collection: {self.attachment_collection}")
+            logger.info(f"AGENTS/RAG_AGENT - _initialize_vectorstore() - Setting up parameters for attachment collection: {self.attachment_collection}")
 
         except Exception as e:
-            self.logger.error(f"Failed to connect to Milvus: {e}")
+            logger.error(f"AGENTS/RAG_AGENT - _initialize_vectorstore() - Failed to connect to Milvus: {e}")
             raise
 
 
     def _format_docs(self, docs: List[Document]) -> str:
         formatted_docs = []
-        self.logger.info(f"Docs length: {len(docs)}") 
+        
+        logger.info(f"AGENTS/RAG_AGENT - _format_docs() - Formatting {len(docs)} LangChain documents") 
 
         for doc in docs:
             metadata = doc.metadata.get("metadata", {})
+            
             # Mails
             if "conversation_id" in metadata:
                 formatted_docs.append(
@@ -100,6 +112,7 @@ class EmailRAGAgent:
                     f"Message Type: {metadata.get('message_type', 'N/A')}\n"
                     f"Content: {doc.page_content}\n"
                 )
+            
             # Mails with attachments
             elif "file_name" in metadata:
                 formatted_docs.append(
@@ -110,42 +123,53 @@ class EmailRAGAgent:
                     f"Type: {metadata.get('file_type', 'N/A')}\n"  
                     f"Content: {doc.page_content}\n"
                 )
-
+        
+        logger.info(f"AGENTS/RAG_AGENT - _format_docs() - Successfully formatted LangChain documents") 
         return "\n\n".join(formatted_docs)
     
     def _determine_query_type(self, question: str) -> Dict:
         """Determine the type and requirements of the query"""
-        query_analysis_prompt = """
-        Analyze the following email search query and determine its characteristics:
-        Query: {question}
         
-        Provide a JSON response with:
-        1. primary_focus: "emails" or "attachments" or "both"
-        2. time_sensitive: boolean (does query imply time relevance?)
-        3. sender_specific: boolean (is query about specific senders?)
-        4. requires_summarization: boolean (does response need summarization?)
-        5. search_priority: "recent", "relevance", or "all"
+        query_analysis_prompt = f"""
+            Analyze the following email search query and determine its characteristics:
+            Query: {question}
+            
+            Provide a JSON response with:
+            1. primary_focus: "emails" or "attachments" or "both"
+            2. time_sensitive: boolean (does query imply time relevance?)
+            3. sender_specific: boolean (is query about specific senders?)
+            4. requires_summarization: boolean (does response need summarization?)
+            5. search_priority: "recent", "relevance", or "all"
+
+            RESTRICTION: THE OUTPUT YOU PROVIDE WILL BE DIRECTLY FED TO json.loads() IN PYTHON. WRITE YOUR RESPONSE IN A WAY THAT json.loads() CAN HANDLE.
         """
         
         try:
             analysis = self.llm.invoke(query_analysis_prompt.format(question=question))
             return json.loads(analysis.content)
+        
         except Exception as e:
-            self.logger.error(f"Error analyzing query: {e}")
+            logger.error(f"AGENTS/RAG_AGENT - _determine_query_type() - Error analyzing query: {e}")
+            
             return {
-                "primary_focus": "both",
-                "time_sensitive": False,
-                "sender_specific": False,
-                "requires_summarization": True,
-                "search_priority": "relevance"
+                "primary_focus"          : "both",
+                "time_sensitive"         : False,
+                "sender_specific"        : False,
+                "requires_summarization" : True,
+                "search_priority"        : "relevance"
             }
     
     def _combined_retrieval(self, question: str) -> str:
-        """Search both email and attachment collections"""
+        """ Search both email and attachment collections """
+
+        logger.info(f"AGENTS/RAG_AGENT - _combined_retrieval() - Attempting a combined search for emails and attachments")
+        
         query_analysis = self._determine_query_type(question)
         results = []
         
         try:
+            logger.info(f"AGENTS/RAG_AGENT - _combined_retrieval() - Searching for relevant emails...")
+
             email_k = 5 if query_analysis["primary_focus"] in ["emails", "both"] else 2
             attachment_k = 3 if query_analysis["primary_focus"] in ["attachments", "both"] else 1
             
@@ -161,16 +185,19 @@ class EmailRAGAgent:
             for email_result in email_results:
                 results.append(email_result)
 
-            self.logger.info(f"Found {len(email_results)} relevant emails")
+            logger.info(f"AGENTS/RAG_AGENT - _combined_retrieval() - Found {len(email_results)} relevant emails")
+        
         except Exception as e:
-            self.logger.error(f"Error searching emails: {e}")
+            logger.error(f"AGENTS/RAG_AGENT - _combined_retrieval() - Error searching emails: {e}")
 
         try:
+            logger.info(f"AGENTS/RAG_AGENT - _combined_retrieval() - Searching for relevant attachments...")
+
             # Search attachments
             attachment_retriever = self.attachment_vectorstore.as_retriever(
                 search_kwargs={
-                    "k": attachment_k,
-                    "score_threshold": 0.65 if query_analysis["primary_focus"] == "attachments" else 0.75
+                    "k"               : attachment_k,
+                    "score_threshold" : 0.65 if query_analysis["primary_focus"] == "attachments" else 0.75
                 }
             )
 
@@ -178,15 +205,18 @@ class EmailRAGAgent:
             for attachment_result in attachment_results:
                 results.append(attachment_result)
                     
-            self.logger.info(f"Found {len(attachment_results)} relevant attachments")
+            logger.info(f"AGENTS/RAG_AGENT - _combined_retrieval() - Found {len(attachment_results)} relevant attachments")
+        
         except Exception as e:
-            self.logger.error(f"Error searching attachments: {e}")
-
+            logger.error(f"AGENTS/RAG_AGENT - _combined_retrieval - Error searching attachments: {e}")
 
         return self._format_docs(results)
 
     def _setup_rag_chain(self):
         """Set up the RAG chain with configurable retriever"""
+
+        logger.info(f"AGENTS/RAG_AGENT - _setup_rag_chain() - Setting up a RAG chain")
+        
         prompt_template = """
         You are an intelligent email assistant with access to emails and their attachments. 
         Analyze the provided context carefully and provide a helpful, well-structured response.
@@ -214,8 +244,8 @@ class EmailRAGAgent:
         """
         
         self.prompt = PromptTemplate(
-            template=prompt_template,
-            input_variables=["context", "question"]
+            template        = prompt_template,
+            input_variables = ["context", "question"]
         )
 
         self.rag_chain = (
@@ -230,42 +260,63 @@ class EmailRAGAgent:
 
     def search(self, query: str) -> Dict:
         """Search for relevant emails and attachments"""
+
+        logger.info(f"AGENTS/RAG_AGENT - search() - Setting up a RAG chain")
+        
         try:
             response = self.rag_chain.invoke(query)
             
             return {
-                "query": query,
-                "response": response,
-                "status": "success"
+                "query"     : query,
+                "response"  : response,
+                "status"    : "success"
             }
 
         except Exception as e:
-            self.logger.error(f"Error processing search: {e}")
+            logger.error(f"AGENTS/RAG_AGENT - search() - Error processing search: {e}")
+            
             return {
-                "query": query,
-                "error": str(e),
-                "status": "error"
+                "query"  : query,
+                "error"  : str(e),
+                "status" : "error"
             }
 
-
-# Initialize
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-try:
-    # Initialize RAG agent with user email
-    user_email = "nasika.d@northeastern.edu"
-    rag_agent = EmailRAGAgent(logger, user_email)
-
-    # Test a search
-    query = "What are the mails sent by Gail regarding all job applications"
-    result = rag_agent.search(query)
+def RagAgentNode(state: AgentState,):
+    """ LangGraph Node to invoke the RAG agent """
     
-    if result["status"] == "success":
-        print(f"\nQuery: {query}")
-        print(f"Response: {result['response']}")
-    else:
-        print(f"Error: {result['error']}")
+    try:
+        logger.info(f"AGENTS/RAG_AGENT - RagAgentNode() - Invoking RAG agent...")
 
-except Exception as e:
-    print(f"Error initializing RAG agent: {e}")
+        # Initialize RAG agent with user email
+        user_email = state.get("user_email", None)
+        query = state.get("corrected_prompt", None)
+
+        if not user_email:
+            raise(f"user_email '{user_email}'is missing to identify vector store")
+        
+        if not query:
+            query = state.get("current_input", None)
+
+        if not query:
+            raise(f"Both 'corrected_prompt' and 'current_input' are empty!")
+        
+        rag_agent = EmailRAGAgent(user_email)
+
+        logger.info(f"AGENTS/RAG_AGENT - RagAgentNode() - Starting a similarity search...")
+        result = rag_agent.search(query)
+        
+        if result["status"] == "success":
+            logger.info(f"AGENTS/RAG_AGENT - RagAgentNode() - Response generated successfully")
+
+            state["rag_status"] = "success"
+            state["rag_response"] = result['response']
+        
+        else:
+            logger.error(f"AGENTS/RAG_AGENT - RagAgentNode() - {result['error']}")
+            state["rag_status"] = "error"
+
+    except Exception as e:
+        logger.error(f"AGENTS/RAG_AGENT - RagAgentNode() - Error initializing RAG agent: {e}")
+
+    finally:
+        return state
