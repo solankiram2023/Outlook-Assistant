@@ -1,4 +1,3 @@
-# mailbox.py
 import streamlit as st
 from datetime import datetime
 import os
@@ -8,13 +7,12 @@ import tempfile
 from audio_recorder_streamlit import audio_recorder
 from dotenv import load_dotenv
 from streamlit_quill import st_quill
-
+from streamlit_chat import message
 from email_service import EmailService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 # Load environment variables
 load_dotenv()
@@ -22,11 +20,8 @@ load_dotenv()
 # Initialize EmailService
 email_service = EmailService()
 
-
 def text_to_speech(text, voice="alloy"):
     """Convert text to speech using OpenAI's TTS API"""
-    
-    # Initialize OpenAI client with API key
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
         st.error("OpenAI API key not found. Please set OPENAI_API_KEY in your environment variables.")
@@ -35,33 +30,24 @@ def text_to_speech(text, voice="alloy"):
     client = OpenAI(api_key=api_key)
     
     try:
-        # Create temporary file for audio
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_audio:
-            # Generate speech using OpenAI's TTS
             response = client.audio.speech.create(
                 model="tts-1",
                 voice=voice,
                 input=text
             )
-            
-            # Save to temporary file
             response.stream_to_file(temp_audio.name)
             return temp_audio.name
-            
     except Exception as e:
         st.error(f"Error generating speech: {str(e)}")
         return None
 
 def record_and_transcribe():
-    # Initialize OpenAI client with API key
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
         st.error("OpenAI API key not found. Please set OPENAI_API_KEY in your environment variables.")
         return None
 
-    client = OpenAI(api_key=api_key)
-
-    # Add the audio recorder
     st.markdown("### Record Audio")
     audio_bytes = audio_recorder(
         text="Click to record",
@@ -71,60 +57,53 @@ def record_and_transcribe():
         icon_size="2x"
     )
 
-    # Process the audio if recorded
     if audio_bytes:
         try:
-            # Save audio to a temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-                temp_audio.write(audio_bytes)
-                temp_audio_path = temp_audio.name
-
-            # Show a status message
             with st.spinner("Transcribing..."):
-                # Transcribe using OpenAI Whisper API
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+                    temp_audio.write(audio_bytes)
+                    temp_audio_path = temp_audio.name
+
+                client = OpenAI(api_key=api_key)
                 with open(temp_audio_path, "rb") as audio_file:
                     transcript = client.audio.transcriptions.create(
                         model="whisper-1",
                         file=audio_file
                     )
 
-            # Clean up the temporary file
-            os.unlink(temp_audio_path)
-
-            # Access transcription text (correctly handle transcript object)
-            if isinstance(transcript, dict) and "text" in transcript:
-                return transcript["text"]
-            else:
-                st.error("Unexpected response format from OpenAI API.")
-                return None
-
+                os.unlink(temp_audio_path)
+                
+                if isinstance(transcript, dict) and "text" in transcript:
+                    return transcript["text"]
+                else:
+                    st.error("Unexpected response format from OpenAI API.")
+                    return None
         except Exception as e:
             st.error(f"Error during transcription: {str(e)}")
             return None
 
     return None
 
-
-# Function to get initials from name
 def get_initials(name):
     return ''.join(word[0].upper() for word in name.split() if word)
 
-# Function to get category color
 def get_category(email):
     categories = {
-        'Work'              : ("Work", "#e8f0fe"),
-        'Client Issue'      : ("Client Issue", "#fce8e6"),
-        'Marketing'         : ("Marketing", "#e6f4ea"),
-        'IT Support'        : ("IT Support", "#fff0e0"),
-        'Legal/Contracts'   : ("Legal/Contracts", "#f3e8fd"),
-        'HR/Benefits'       : ("HR/Benefits", "#f7f8fb")
+        'Work': ("Work", "#e8f0fe"),
+        'Client Issue': ("Client Issue", "#fce8e6"),
+        'Marketing': ("Marketing", "#e6f4ea"),
+        'IT Support': ("IT Support", "#fff0e0"),
+        'Legal/Contracts': ("Legal/Contracts", "#f3e8fd"),
+        'HR/Benefits': ("HR/Benefits", "#f7f8fb")
     }
-    
     category_name, color = categories.get(email['category'], ("Other", "#f0f0f0"))
     return category_name, color
 
-# Initialize session state
 def initialize_session_state():
+    if 'show_chatbot' not in st.session_state:
+        st.session_state.show_chatbot = False
+    if 'chat_messages' not in st.session_state:
+        st.session_state.chat_messages = []
     if 'emails' not in st.session_state:
         st.session_state.emails = []
     if 'selected_email_id' not in st.session_state:
@@ -133,6 +112,9 @@ def initialize_session_state():
         st.session_state.show_menu = False
     if 'transcribed_text' not in st.session_state:
         st.session_state.transcribed_text = ""
+    if st.button("💬 Chat"):
+        st.session_state.show_chat = not st.session_state.get('show_chat', False)
+        
 
 # Fetch emails and update session state
 def fetch_emails(email_service):
@@ -163,185 +145,350 @@ def fetch_emails(email_service):
 
 # Load full email content
 def load_email_content(email_id):
-    email_response = email_service.load_email(email_id)
-    if email_response["status"] == 200:
-        email_data = email_response["data"]
-        # Find the index of the email in session state
-        for idx, email in enumerate(st.session_state.emails):
-            if email['id'] == email_id:
-                # Create a new dictionary to avoid reference issues
-                st.session_state.emails[idx] = {
-                    **email,  # Spread existing email data
-                    'content': email_data['body'],  # Update content
-                    'attachments': email_data.get('attachments', [])
-                }
-                print(f"Updated content in session state: {st.session_state.emails[idx]['content']}")
+    """
+    Load and process email content from the API
+    Returns None if there's an error loading the email
+    """
+    try:
+        email_response = email_service.load_email(email_id)
+        if email_response["status"] == 200:
+            email_data = email_response["data"]
+            
+            # Find and update the email in session state
+            for idx, email in enumerate(st.session_state.emails):
+                if email['id'] == email_id:
+                    # Create a new dictionary with updated content
+                    st.session_state.emails[idx] = {
+                        **email,  # Preserve existing email data
+                        'content': email_data.get('body', ''),  # Safely get body content
+                        'attachments': email_data.get('attachments', []),
+                        'read': True  # Mark as read
+                    }
+                    return email_data
+        else:
+            logger.error(f"Failed to load email {email_id}: {email_response.get('message', 'Unknown error')}")
+            return None
+    except Exception as e:
+        logger.error(f"Error loading email {email_id}: {str(e)}")
+        return None
 
 
 # Render email list
+
 def render_email_list():
-    st.markdown(f"### {st.session_state.selected_folder}")
 
-    # Add audio recorder with transcription
-    st.write("Search by voice:")
+    # Header with title and refresh button
+    col1, col2 = st.columns([8, 1]) 
 
-    # Record and Clear Buttons
-    col_record, col_clear = st.columns([4, 1])
+    with col1:
+        st.markdown(f"### {st.session_state.selected_folder}")
 
-    with col_record:
-        transcribed_text = record_and_transcribe()
-        if transcribed_text:
-            st.session_state.transcribed_text = transcribed_text
+    with col2:
+        if st.button("🔄", key="refresh_button"):
+            # Call fetch_emails function to reload the email list
+            response = email_service.fetch_emails(st.session_state.selected_folder)
+            if response["status"] == 200:
+                # Update session state emails
+                st.session_state.emails = [
+                    {
+                        "id": email["email_id"],
+                        "sender": email["sender_name"],
+                        "email": email["sender_email"],
+                        "subject": email["subject"],
+                        "content": email["body_preview"] if email.get("body_preview") else "",
+                        "date": email["received_datetime"],
+                        "read": email.get("is_read", False),
+                        "starred": False,
+                        "category": "Work",
+                        "attachments": email_service.load_attachments(email["email_id"]) if email.get("has_attachments") else []
+                    }
+                    for email in response["data"]
+                ]
+                # Set a success flag in session state
+                st.session_state.refresh_success = True
+            else:
+                # Handle error, optionally set an error flag
+                st.session_state.refresh_success = False
+                st.error(f"Failed to refresh emails: {response['message']}")
 
-    with col_clear:
-        if st.button("Clear", use_container_width=True):
-            st.session_state.transcribed_text = ""
-
+    
     # Search Input Field
-    st.text_input(
+    search_query = st.text_input(
         label="Search",
         label_visibility="hidden",
-        key="search",
-        placeholder="Search mail...",
-        value=st.session_state.get("transcribed_text", "")
-    )
+        key="email_search", 
+        placeholder="Search mail..."
+    ).lower()
+    
+    st.session_state.search_query = search_query
+
+    # Filter emails based on search query
+    filtered_emails = st.session_state.get("emails", [])
+    if search_query:
+        filtered_emails = [
+            email for email in filtered_emails
+            if search_query in email.get("sender", "").lower() or
+            search_query in email.get("email", "").lower() or
+            search_query in email.get("subject", "").lower() or
+            search_query in email.get("content", "").lower() or
+            search_query in email.get("category", "").lower()
+        ]
 
     # Email List Container
     email_list_container = st.container()
 
     # Render emails in a structured format
     with email_list_container:
-        for idx, email in enumerate(st.session_state.get("emails", [])):  # Use enumerate for unique indexing
-            category, bg_color = get_category(email)
-            initials = get_initials(email["sender"])
+        if not filtered_emails:
+            if search_query:
+                st.info("No emails match your search.")
+            else:
+                st.info("No emails found. Please refresh or try again.")
+        else:
+            for idx, email in enumerate(filtered_emails):
+                category, bg_color = get_category(email)
+                initials = get_initials(email["sender"])
 
-            with st.container():
-                cols = st.columns([8, 2])  # Adjusted column sizes for better alignment
+                with st.container():
+                    cols = st.columns([8, 2])  
 
-                # Left Column: Email Preview
-                with cols[0]:
-                    preview_content = email["content"][:50] + "..." if email["content"] else "No preview available"
+                    # Left Column: Email Preview
+                    with cols[0]:
+                        preview_content = email["content"][:50] + "..." if email["content"] else "No preview available"
 
-                    email_html = f"""
-                    <div class="email-list-item" style="margin-bottom: 10px;">
-                        <div class="profile-pic" style="background-color: {bg_color}; width: 50px; height: 50px; border-radius: 25px; display: inline-block; text-align: center; line-height: 50px;">
-                            <span style="color: gray; font-size: 14px;">{initials}</span>
-                        </div>
-                        <div class="email-content-preview" style="display: inline-block; margin-left: 10px; vertical-align: top; width: calc(100% - 70px);">
-                            <div class="sender-name" style="font-weight: bold; font-size: 14px;">{email['sender']}</div>
-                            <div class="email-subject" style="color: #555; font-size: 12px;">{email['subject']}</div>
-                            <div style="font-size: 12px; color: #777;">{preview_content}</div>
-                            <div class="category-tag" style="margin-top: 5px; display: inline-block; padding: 2px 5px; font-size: 10px; border-radius: 3px; background-color: {bg_color}; color: white;">
-                                {category}
+                        email_html = f"""
+                        <div class="email-list-item" style="margin-bottom: 10px;">
+                            <div class="profile-pic" style="background-color: {bg_color}; width: 50px; height: 50px; border-radius: 25px; display: inline-block; text-align: center; line-height: 50px;">
+                                <span style="color: gray; font-size: 14px;">{initials}</span>
+                            </div>
+                            <div class="email-content-preview" style="display: inline-block; margin-left: 10px; vertical-align: top; width: calc(100% - 70px);">
+                                <div class="sender-name" style="font-weight: bold; font-size: 14px;">{email['sender']}</div>
+                                <div class="email-subject" style="color: #555; font-size: 12px;">{email['subject']}</div>
+                                <div style="font-size: 12px; color: #777;">{preview_content}</div>
+                                <div class="category-tag" style="margin-top: 5px; display: inline-block; padding: 2px 5px; font-size: 10px; border-radius: 3px; background-color: {bg_color}; color: white;">
+                                    {category}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    """
+                        """
 
-                    if email.get("starred"):
-                        email_html += '<div class="flag-icon">🚩</div>'
+                        if email.get("starred"):
+                            email_html += '<div class="flag-icon">🚩</div>'
 
-                    st.markdown(email_html, unsafe_allow_html=True)
+                        st.markdown(email_html, unsafe_allow_html=True)
 
-                # Right Column: View Button
-                with cols[1]:
-                    # Ensure unique key using idx from enumerate
-                    if st.button("View", key=f"select_{email['id']}_{idx}", use_container_width=True):
-                        print(f"Before setting selected email: {email['content']}")
-                        st.session_state.selected_email_id = email["id"]
-                        load_email_content(email["id"])
-                        print(f"After loading content: {st.session_state.emails[idx]['content']}")
-                        st.rerun()
+                    # Right Column: View Button
+                    with cols[1]:
+                        if st.button("View", key=f"select_{email['id']}_{idx}", use_container_width=True):
+                            st.session_state.selected_email_id = email["id"]
+                            load_email_content(email["id"])
+                            logger.info(f"Stored selected_email_id: {email['id']}")
+                            st.rerun()
 
 
 
 # Render selected email
 def render_selected_email():
-    if st.session_state.selected_email_id:
-        selected_email = next(
-            (email for email in st.session_state.emails 
-             if email['id'] == st.session_state.selected_email_id),
-            None
-        )
+    """
+    Render the selected email with proper error handling and content processing
+    """
+    if not st.session_state.selected_email_id:
+        return
 
-        if selected_email:
-            print(f"Selected email content: {selected_email['content']}")
-            header_col1, header_col2, header_col3 = st.columns([8, 2, 1])
+    # Load email content
+    email_data = load_email_content(st.session_state.selected_email_id)
+    
+    if not email_data:
+        st.error("Unable to load email content. Please try again.")
+        return
 
-            with header_col1:
-                st.markdown(f"### {selected_email['subject']}")
-
-            with header_col2:
-                voice_options = {"Alloy": "alloy", "Echo": "echo", "Fable": "fable"}
-                selected_voice = st.selectbox(
-                    "Voice",
-                    options=list(voice_options.keys()),
-                    label_visibility="collapsed"
+    # Create a container for the entire email view
+    with st.container():
+        # Header section with three columns for subject, TTS, and menu
+        header_col1, header_col2, header_col3 = st.columns([7, 2, 1])
+        
+        with header_col1:
+            st.markdown(f"### {email_data.get('subject', 'No Subject')}")
+        
+        # Text-to-speech controls
+        with header_col2:
+            voice_options = {"Alloy": "alloy", "Echo": "echo", "Fable": "fable"}
+            selected_voice = st.selectbox(
+                "Voice",
+                options=list(voice_options.keys()),
+                label_visibility="collapsed"
+            )
+            
+            if st.button("🔊 Read Email"):
+                email_text = (
+                    f"Email from {email_data.get('sender_email', 'Unknown sender')}. "
+                    f"Subject: {email_data.get('subject', 'No subject')}. "
+                    f"Content: {email_data.get('body', 'No content')}"
                 )
-                if st.button("🔊 Read Email"):
-                    email_text = f"Email from {selected_email['sender']}. Subject: {selected_email['subject']}. Content: {selected_email['content']}"
-
-                    with st.spinner("Generating audio..."):
-                        audio_file = text_to_speech(email_text, voice=voice_options[selected_voice])
-                        if audio_file:
+                
+                with st.spinner("Generating audio..."):
+                    audio_file = text_to_speech(email_text, voice=voice_options[selected_voice])
+                    if audio_file:
+                        try:
                             with open(audio_file, 'rb') as f:
                                 audio_bytes = f.read()
                             st.audio(audio_bytes, format='audio/mp3')
-                            os.remove(audio_file)
+                        finally:
+                            # Clean up temp file
+                            if os.path.exists(audio_file):
+                                os.remove(audio_file)
+        
+        # Close button
+        with header_col3:
+            if st.button("✕"):
+                del st.session_state.selected_email_id
+                st.rerun()
 
-            with header_col3:
-                if st.button("⋮", key="menu_button"):
-                    st.session_state.show_menu = not st.session_state.show_menu
+        # Metadata section with safe gets
+        st.markdown(f"**From:** {email_data.get('sender_email', 'Unknown sender')}")
+        try:
+            date_str = datetime.fromisoformat(email_data.get('received_datetime', '')).strftime('%b %d, %Y %I:%M %p')
+        except (ValueError, TypeError):
+            date_str = 'Unknown date'
+        st.markdown(f"**Date:** {date_str}")
+        st.markdown("---")
+        # Safely get and escape email content
+        email_content = email_data.get('body', 'No content available')
+        import html
+        escaped_content = html.escape(email_content)
+        
+        st.markdown(f"""
+            <div class="email-content-container">
+                <div class="email-content">
+                    {escaped_content}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-                if st.session_state.show_menu:
-                    st.markdown("""
-                        <div class="dropdown-container">
-                            <div class="dropdown-item">Archive</div>
-                            <div class="dropdown-item">Delete</div>
-                            <div class="dropdown-item">Mark as unread</div>
-                            <div class="dropdown-item">Snooze</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-
-            st.markdown(f"**From:** {selected_email['sender']} <{selected_email['email']}>")
-            st.markdown(f"**Date:** {datetime.fromisoformat(selected_email['date']).strftime('%b %d, %Y %I:%M %p')}")
-
+        # Attachments section
+        attachments = email_data.get('attachments', [])
+        if attachments:
             st.markdown("---")
-            print(f"Email content: {selected_email['content']}")
-            content_with_newlines = selected_email['content']
-            st.markdown(content_with_newlines, unsafe_allow_html=True)
+            st.markdown("**Attachments:**")
+            for attachment in attachments:
+                st.markdown(f"- {html.escape(str(attachment))}")
 
-            if selected_email.get('attachments'):
-                st.markdown("---")
-                st.markdown("**Attachments:**")
-                for attachment in selected_email['attachments']:
-                    st.markdown(f"- {attachment}")
-
-            st.markdown("---")
-            st.markdown("#### Reply")
-            st_quill(placeholder="Reply to this email...")
-            col_reply1, col_reply2 = st.columns([2, 13])
-
-            with col_reply1:
-                st.button("Send", type="primary")
-
-            with col_reply2:
-                st.button("Save as Draft")
-
-
+        # Reply section
+        st.markdown("---")
+        st.markdown("#### Reply")
+        
+        content = st_quill(
+            placeholder="Reply to this email...",
+            key="reply_box"
+        )
+        
+        col_reply1, col_reply2 = st.columns([1, 13])
+        with col_reply1:
+            st.button("Send", type="primary")
+        with col_reply2:
+            st.button("Save as Draft")
+                    
 # Main mailbox function
-def render_mailbox():
+def render_chat_window():
+    """Render chat window with Q&A style interface and voice input."""
+    # Header with title, mic button, and close button
+    col1, col2, col3 = st.columns([5, 1, 1])
+    with col1:
+        st.title("Chat Assistant")
+    
+    # Add microphone button in middle column
+    with col2:
+        audio_bytes = audio_recorder(
+            text="🎤",
+            recording_color="#e74c3c",
+            neutral_color="#3498db",
+            icon_size="1x"
+        )
+    
+    # Close button in last column
+    with col3:
+        if st.button("✕", key="close_chat"):
+            st.session_state.show_chat = False
+            st.rerun()
 
+    # Initialize messages if not exist
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    # Display chat messages
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+    
+    # Handle audio transcription
+    if audio_bytes and 'audio_processed' not in st.session_state:
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+                temp_audio.write(audio_bytes)
+                temp_audio_path = temp_audio.name
+
+            with st.spinner("Transcribing..."):
+                api_key = os.getenv('OPENAI_API_KEY')
+                if not api_key:
+                    st.error("OpenAI API key not found.")
+                    return
+                
+                client = OpenAI(api_key=api_key)
+                
+                with open(temp_audio_path, "rb") as audio_file:
+                    transcript = client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file
+                    )
+
+            os.unlink(temp_audio_path)
+
+            if hasattr(transcript, 'text'):
+                st.session_state.messages.append({
+                    "role": "user",
+                    "content": transcript.text
+                })
+                st.session_state.audio_processed = True
+                st.rerun()
+
+        except Exception as e:
+            st.error(f"Error during transcription: {str(e)}")
+            logger.error(f"Audio transcription error: {str(e)}")
+
+    # Regular chat input
+    user_question = st.chat_input("Type your message...")
+    
+    if user_question:
+        st.session_state.messages.append({
+            "role": "user", 
+            "content": user_question
+        })
+        response = f"This is a response to: {user_question}"
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": response
+        })
+        st.rerun()
+    
+    # Clear audio_processed flag when no audio is being recorded
+    if not audio_bytes and 'audio_processed' in st.session_state:
+        del st.session_state.audio_processed
+
+# Update your existing render_mailbox function
+def render_mailbox():
     initialize_session_state()
     fetch_emails(email_service)
 
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        render_email_list()
-
-    with col2:
-        render_selected_email()
+    if not st.session_state.get('show_chat', False):
+        # Regular email interface
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            render_email_list()
+        with col2:
+            render_selected_email()
+    else:
+        # Show chat interface
+        render_chat_window()
 
     st.markdown("---")
     st.markdown(

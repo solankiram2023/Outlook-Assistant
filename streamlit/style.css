@@ -1,3 +1,4 @@
+/* Layout */
 [data-testid="column"]:nth-of-type(1) [data-testid="stVerticalBlock"] {
     height: calc(100vh - 100px);
     overflow-y: auto;
@@ -8,8 +9,11 @@
     height: calc(100vh - 100px);
     overflow-y: hidden;
     flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
+/* Email List */
 .email-list-item {
     display: flex;
     padding: 10px;
@@ -23,61 +27,254 @@
     background-color: #f5f5f5;
 }
 
+/* Profile Picture */
 .profile-pic {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    border-radius: 25px;
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: center;
+    line-height: 50px;
     margin-right: 10px;
 }
 
+.initials {
+    color: gray;
+    font-size: 14px;
+}
+
+/* Email Content */
 .email-content-preview {
+    display: inline-block;
+    margin-left: 10px;
+    vertical-align: top;
+    width: calc(100% - 70px);
     flex-grow: 1;
     overflow: hidden;
 }
 
+.email-content {
+    font-size: 1rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+}
+
 .sender-name {
     font-weight: bold;
+    font-size: 14px;
 }
 
 .email-subject {
     color: #666;
+    font-size: 12px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+.preview-text {
+    font-size: 12px;
+    color: #777;
+}
+
+/* Category & Flags */
 .category-tag {
     display: inline-block;
     padding: 2px 8px;
     border-radius: 12px;
-    font-size: 0.8em;
+    font-size: 10px;
     margin-top: 5px;
+    color: white;
 }
 
 .flag-icon {
     margin-left: 10px;
 }
 
-.dropdown-container {
-    position: absolute;
+/* Email Content Container */
+.email-content-container {
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    height: auto;
+    overflow: visible;
+}
+
+/* Chat Styling */
+.chat-container {
+    position: relative;
+    height: calc(100vh - 200px);
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-messages {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-bottom: 5px;
+}
+
+.chat-input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
     right: 0;
     background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 5px;
+    border-top: 1px solid #ddd;
+}
+
+/* Chat Message Elements */
+[data-testid="stChatMessageData"],
+div.stChatContainer,
+.stChatMessage,
+div[data-testid="stHorizontalBlock"] {
+    border: none !important;
+}
+
+[data-testid="stChatMessageContent"] {
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+
+/* Hide Chat Dividers */
+.chat-container hr,
+[data-testid="stChatMessageContent"] hr,
+[data-testid="stMarkdownContainer"] hr {
+    display: none !important;
+}
+
+/* Chat Button */
+.chat-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 30px;
+    cursor: pointer;
+    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+    transition: background-color 0.2s;
+}
+
+.chat-button:hover {
+    background-color: #2980b9;
+}
+
+.chat-button-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
     z-index: 1000;
 }
 
-.dropdown-item {
-    padding: 8px 16px;
-    cursor: pointer;
+/* Search Input */
+[data-testid="stTextInput"] > div:first-child {
+    width: 80% !important;
+    margin: 0 auto !important;
 }
 
-.dropdown-item:hover {
-    background-color: #f5f5f5;
+[data-testid="stTextInput"] input {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+}
+
+/* Buttons */
+.stButton > button {
+    width: 100% !important;
+    text-align: left !important;
+    padding: 12px 16px !important;
+    margin: 4px 0 !important;
+    min-height: 48px !important;
+    border-radius: 6px !important;
+    font-size: 15px !important;
+    display: flex !important;
+    align-items: center !important;
+    transition: background-color 0.2s;
+    height: 38px;
+}
+
+.stButton > button[kind="primary"] {
+    background-color: #0066FF;
+    color: white;
+}
+
+.stButton > button[kind="secondary"] {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #212529;
+}
+
+.stButton button.selected {
+    background-color: #e6f3ff !important;
+    color: #0078d4 !important;
+}
+
+.stButton button:hover {
+    background-color: #f0f0f0 !important;
+}
+
+/* Quill Editor */
+.quill {
+    margin-top: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.ql-container {
+    min-height: 150px;
+}
+
+[data-testid="stVerticalBlock"] .quill-editor {
+    background-color: white;
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+    min-height: 150px;
+}
+
+/* Scrollbar */
+.email-content-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.email-content-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.email-content-container::-webkit-scrollbar-thumb {
+    background: #888;
+}
+
+.email-content-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] > div {
+    padding: 1rem 0.5rem !important;
+    width: 300px !important;
+}
+
+/* Status Indicators */
+.folder-count {
+    background-color: #e0e0e0;
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 13px;
+    color: #666;
+    margin-left: auto;
+    min-width: 28px;
+    text-align: center;
 }
 
 .refresh-time {
@@ -93,146 +290,17 @@
     border-top: 1px solid #ddd;
 }
 
-.attachment-section {
-    margin: 1rem 0;
-    padding: 1rem;
-    background-color: #f8f9fa;
-    border-radius: 4px;
-}
-
-.attachment-item {
+/* Align mic button with title */
+[data-testid="column"]:nth-of-type(2) {
     display: flex;
-    align-items: center;
-    padding: 0.5rem;
-    margin: 0.25rem 0;
-    background-color: white;
-    border: 1px solid #e9ecef;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
+    align-items: left;
+    justify-content: left;
 }
 
-.attachment-item:hover {
-    background-color: #f1f3f5;
-    cursor: pointer;
-}
-
-.attachment-icon {
-    font-size: 1.5rem;
-    margin-right: 1rem;
-}
-
-.attachment-name {
-    flex-grow: 1;
-    font-size: 0.9rem;
-}
-
-.attachment-size {
-    color: #6c757d;
-    font-size: 0.8rem;
-}
-
-/* Style for attachment button */
-.attachment-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center; /* Centers the text inside the button */
-    padding: 0.5rem 1rem; /* Adjust padding to provide adequate spacing */
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    min-width: 75px; /* Ensures the button is wide enough to fit the text */
-    white-space: nowrap; /* Prevents text wrapping inside the button */
-    text-align: center; /* Centers the text */
-}
-
-.attachment-button:hover {
-    background-color: #e9ecef;
-}
-
-
-.attachment-preview {
-    margin-top: 1rem;
-    padding: 0.5rem;
-    background-color: #f8f9fa;
-    border-radius: 4px;
-}
-
-/* Reset sidebar spacing */
-section[data-testid="stSidebar"] > div {
-    padding: 1rem 0.5rem !important;
-    width: 300px !important;
-}
-
-/* Column container styling */
-div[data-testid="column-container"] {
-    width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-}
-
-/* Navigation button styling */
-.stButton button {
-    width: 100% !important;
-    text-align: left !important;
-    padding: 12px 16px !important;
-    margin: 4px 0 !important;
-    min-height: 48px !important;
-    border-radius: 6px !important;
-    font-size: 15px !important;
-    display: flex !important;
-    align-items: center !important;
-}
-
-/* Button text styling */
-.stButton button p {
-    margin: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-}
-
-/* Folder count styling */
-.folder-count {
-    background-color: #e0e0e0;
-    border-radius: 12px;
-    padding: 3px 10px;
-    font-size: 13px;
-    color: #666;
-    text-align: center;
-    margin: 12px 0;
-    min-width: 28px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-/* Column styling */
-[data-testid="column"]:first-child {
-    padding-right: 8px !important;
-}
-
-[data-testid="column"]:last-child {
-    padding-left: 0 !important;
-}
-
-/* Add hover effect */
-.stButton button:hover {
-    background-color: #f0f0f0 !important;
-}
-
-/* Selected state styling */
-.stButton button.selected {
-    background-color: #e6f3ff !important;
-    color: #0078d4 !important;
-}
-
-/* Separator styling */
-hr {
-    margin: 1rem 0 !important;
+/* Style mic button */
+.audio-recorder {
     border: none !important;
-    border-top: 1px solid #e0e0e0 !important;
+    background: transparent !important;
+    padding: 8px !important;
+    margin-top: 8px !important;
 }
