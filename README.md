@@ -8,22 +8,22 @@ The Outlook Email Management Assistant enables users to efficiently manage their
 ### Application Links
 Streamlit:
 FastAPI:
-Airflow
+Airflow: 
 
 ### Documentation
-Codelabs Link:
+Codelabs Link: https://codelabs-preview.appspot.com/?file_id=19F-oNrpfrvN73wmcrOozv6A72wKVv1PLru9mqvLXvps#0
 
 ### Demo
-Demo Link:
+Demo Link: 
 
 ## Attestation and Team Contribution
 **WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK**
 
 Name | NUID | Contribution% | Work_Contributed
 --- | --- | --- | --- |
-Sandeep Suresh Kumar | 002841297 | 33% | PyMuPDF Extractor Tool, FastAPI, Dockerization
-Deepthi Nasika       | 002474582 | 33% | 
-Gomathy Selvamuthiah | 002410534 | 33% | Adobe PDF Extractor Tool, Streamlit, Documentation
+Sandeep Suresh Kumar | 002841297 | 33% | 
+Deepthi Nasika       | 002474582 | 33% | Fetching token response from FastAPI endpoint, formatting and loading it into the database, fetching mails with Microsoft Graph API, processing mail contents, formattting them and loading them into the database, extracting attachment contents, Setting up Airflow with docker, FastAPI endpoints for fetching mails with category, sending an email, getting the category of emails, RAG agent, Auto Response Agent, Streamlit for loading mails based on the email folder
+Gomathy Selvamuthiah | 002410534 | 33% | Processing Mail Attachments, Endpoints for fetching and loading mails, Summarization agent, Streamlit Pages for Mailbox UI, Chatbot Interface, Audio to Text and Text to Audio Translation, Refreshing Mails, Search functionality
 Ramy Solanki         | 002816593 | 33% | JWT Implementation, DB Schema
 
 ## Workflow
