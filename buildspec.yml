@@ -1,0 +1,50 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: "us-east-2"
+
+phases: 
+  install: 
+    commands:
+      - echo "Installing Docker..."
+      - apt-get update
+      - apt-get install -y wget
+      
+      # Download Docker Engine packages:
+      - wget --quiet -O "containerd.deb" "https://download.docker.com/linux/ubuntu/dists/jammy/pool/stable/amd64/containerd.io_1.6.33-1_amd64.deb"
+      - wget --quiet -O "docker_ce_cli.deb" "https://download.docker.com/linux/ubuntu/dists/jammy/pool/stable/amd64/docker-ce-cli_26.1.4-1~ubuntu.22.04~jammy_amd64.deb"
+      - wget --quiet -O "docker_ce.deb" "https://download.docker.com/linux/ubuntu/dists/jammy/pool/stable/amd64/docker-ce_26.1.4-1~ubuntu.22.04~jammy_amd64.deb"
+      - wget --quiet -O "docker_buildx_plugin.deb" "https://download.docker.com/linux/ubuntu/dists/jammy/pool/stable/amd64/docker-buildx-plugin_0.14.1-1~ubuntu.22.04~jammy_amd64.deb"
+      - wget --quiet -O "docker_compose_plugin.deb" "https://download.docker.com/linux/ubuntu/dists/jammy/pool/stable/amd64/docker-compose-plugin_2.27.1-1~ubuntu.22.04~jammy_amd64.deb"
+      
+      # Install the downloaded packages
+      - dpkg -i "containerd.deb"
+      - dpkg -i "docker_ce_cli.deb"
+      - dpkg -i "docker_ce.deb"
+      - dpkg -i "docker_buildx_plugin.deb"
+      - dpkg -i "docker_compose_plugin.deb"
+      
+      # Remove the installer packages
+      - rm -f "containerd.deb" "docker_ce.deb" "docker_ce_cli.deb" "docker_buildx_plugin.deb" "docker_compose_plugin.deb"
+      
+      # Check if Docker is installed and running
+      - echo "Running docker 'hello-world' to check if installation was successful..."
+      - docker run hello-world
+  
+  pre_build:
+    commands:
+      - echo "Attempting to login to AWS ECR..."
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+  
+  build:
+    commands:
+      - echo "Building images [latest]..."
+      - docker build --no-cache -f ./fastapi/Dockerfile -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/fastapi-image:latest ./fastapi
+      - docker build --no-cache -f ./streamlit/Dockerfile  -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/streamlit-image:latest ./streamlit
+  
+  post_build:
+    commands:
+      - echo "Pushing [prod] images to AWS ECR..."
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/fastapi-image:latest
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/streamlit-image:latest
