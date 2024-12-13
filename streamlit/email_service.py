@@ -19,7 +19,7 @@ class EmailService:
         """Fetch all emails from the API."""
         try:
             logger.info("Fetching emails from API...")
-            response = requests.get(f"{self.base_url}/{os.getenv("FETCH_MAILS_ENDPOINT")}/{folder}")
+            response = requests.get(f"{self.base_url}/{os.getenv('FETCH_MAILS_ENDPOINT')}/{folder}")
             response.raise_for_status()
             data = response.json()
             logger.info(f"Successfully fetched {len(data.get('data', []))} emails")
@@ -73,7 +73,7 @@ class EmailService:
         """Load specific email details with S3 attachment information."""
         try:
             logger.info(f"Loading email details for ID: {email_id}")
-            response = requests.get(f"{self.base_url}/{os.getenv("LOAD_MAILS_ENDPOINT")}/{email_id}")
+            response = requests.get(f"{self.base_url}/{os.getenv('LOAD_MAILS_ENDPOINT')}/{email_id}")
             response.raise_for_status()
             data = response.json()
             
@@ -149,5 +149,39 @@ class EmailService:
             return {
                 "status": 500,
                 "message": f"Failed to load categories for email {email_id}",
+                "data": []
+            }
+        
+        
+    def send_user_prompt(self, user_email: str, user_input: str, email_id) -> Dict[str, Any]:
+        """Sending user prompt to chatbot"""
+        try:
+            logger.info(f"Sending user prompt {user_input} to chatbot")
+
+            logger.info(f"URL for chatbot: {self.base_url}{os.getenv('CHAT_ENDPOINT')}")
+            data = {
+                        "user_input": user_input,
+                        "user_email": user_email,
+                        "email_context": {
+                            "email_id": email_id
+                        }
+                    }
+            logger.info(f"JSON: {data}")
+
+            # Make the POST request with JSON payload
+            response = requests.post(
+                url=f"{self.base_url}{os.getenv('CHAT_ENDPOINT')}",
+                json=data
+            )
+            response.raise_for_status()
+            logger.info(f"Response = {response.json()}")
+            
+            return response.json()
+                
+        except requests.RequestException as e:
+            logger.error(f"An error occurred while sending the user prompt: {e}")
+            return {
+                "status": 500,
+                "message": f"An error occurred while sending the user prompt: {e}",
                 "data": []
             }
