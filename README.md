@@ -19,10 +19,10 @@ Codelabs Link: https://codelabs-preview.appspot.com/?file_id=19F-oNrpfrvN73wmcrO
 
 Name | NUID | Contribution% | Work_Contributed
 --- | --- | --- | --- |
-Sandeep Suresh Kumar | 002841297 | 33% | 
-Deepthi Nasika       | 002474582 | 33% | Fetching token response from FastAPI endpoint, formatting and loading it into the database, fetching mails with Microsoft Graph API, processing mail contents, formatting them and loading them into the database, Setting up Airflow with docker, FastAPI endpoints for fetching mails with category, sending an email, getting the category of emails, RAG agent, Auto Response Agent, Streamlit for loading emails based on the email folder
+Sandeep Suresh Kumar | 002841297 | 33% | Endpoints for Microsoft SignIn, Triggering Airflow, Vector Embeddings for mail contents, mail attachment contents, Endpoint for Chatbot, Prompt Agent, Langgraph Implementation to handle multiple agents, CI/CD, Email Categorization
+Deepthi Nasika       | 002474582 | 33% | Token responses, Fetching mails with Microsoft Graph API, Processing mail contents, attachment contents into database, Setup Airflow, Endpoints for Mails with folder, RAG agent, Auto Response Agent, Streamlit for connecting with Fastapi endpoints
 Gomathy Selvamuthiah | 002410534 | 33% | Processing Mail Attachments, Endpoints for fetching and loading mails, Summarization agent, Streamlit Pages for Mailbox UI, Chatbot Interface, Audio to Text and Text to Audio Translation, Refreshing Mails, Search functionality
-Ramy Solanki         | 002816593 | 33% | JWT Implementation, DB Schema
+Ramy Solanki         | 002816593 | 33% |  
 
 ## Workflow
 
@@ -37,8 +37,10 @@ The Airflow pipeline streamlines the process of managing email data by automatin
 
 
 ## FastAPI
-Acts as the backend service to integrate Milvis, Langraph agents, and the user interface.
-Provide endpoints for sign-in, getting access tokens, mail exploration, querying, etc.
+Acts as the backend service to integrate Milvus, Mulit-agentic architecture with Langgraph, and the Streamlit user interface. The endpoints are:
+1. SignIn - Microsoft Authentication
+2. AccessToken - Getting access token to make calls to Microsoft Graph API
+3. 
 
 ## LangGraph (Agents):
 Prompt Correction Agent: This agent takes the user’s prompt and passes it through a Large Language Model (LLM), which then rewrites the prompt to improve clarity and specificity for better results. To simplify the process, human approval for the regenerated prompt is skipped.
