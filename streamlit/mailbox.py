@@ -392,41 +392,82 @@ def render_selected_email():
             date_str = 'Unknown date'
         st.markdown(f"**Date:** {date_str}")
         st.markdown("---")
-        # Safely get and escape email content
-        email_content = email_data.get('body', 'No content available')
-        import html
-        escaped_content = html.escape(email_content)
-        
-        st.markdown(f"""
-            <div class="email-content-container">
-                <div class="email-content">
-                    {escaped_content}
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
 
-        # Attachments section
+        # Render email content
+        email_content = email_data.get('body', 'No content available')
         attachments = email_data.get('attachments', [])
+
+        # Display email body
+        st.markdown(f"#### Email Content:")
+        st.markdown(email_content)
+
+        # Display attachments
         if attachments:
-            st.markdown("---")
-            st.markdown("**Attachments:**")
+            st.markdown("#### Attachments:")
             for attachment in attachments:
-                st.markdown(f"- {html.escape(str(attachment))}")
+                if isinstance(attachment, dict):
+                    # Retrieve attachment details
+                    name = attachment.get('name', 'Unnamed Attachment')
+                    url = attachment.get('bucket_url') or attachment.get('download_url', '#')
+                    size = attachment.get('size', 'Unknown size')
+                    content_type = attachment.get('content_type', 'Unknown type')
+
+                    # Render attachment details
+                    st.markdown(
+                        f"- 📎 **[{name}]({url})** ({size}, {content_type})",
+                        unsafe_allow_html=True
+                    )
+                else:
+                    # Handle case where attachment is a simple string URL
+                    st.markdown(f"- 📎 **[Download Attachment]({attachment})**", unsafe_allow_html=True)
+
 
         # Reply section
         st.markdown("---")
         st.markdown("#### Reply")
         
-        content = st_quill(
-            placeholder="Reply to this email...",
-            key="reply_box"
+        # Replace the st_quill with custom reply form
+        reply_to = email_data.get('sender_email', '')
+        reply_subject = f"Re: {email_data.get('subject', 'No Subject')}"
+        original_body = email_data.get('body', '')
+        
+        # To field
+        st.text_input("To:", value=reply_to, key="reply_to")
+        
+        # Subject field
+        st.text_input("Subject:", value=reply_subject, key="reply_subject")
+        
+        # Body field with formatting toolbar
+        st.markdown("""
+        <div style="border-bottom: 1px solid #ddd; padding: 8px 0; margin-bottom: 8px;">
+            <button style="margin-right: 8px; padding: 4px 8px;">B</button>
+            <button style="margin-right: 8px; padding: 4px 8px;"><i>I</i></button>
+            <button style="margin-right: 8px; padding: 4px 8px;"><u>U</u></button>
+            <select style="padding: 4px 8px;">
+                <option>Sans Serif</option>
+                <option>Serif</option>
+            </select>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        reply_content = st.text_area(
+            "Body:",
+            value="",
+            height=300,
+            key="reply_body",
+            label_visibility="collapsed"
         )
         
-        col_reply1, col_reply2 = st.columns([1, 13])
-        with col_reply1:
-            st.button("Send", type="primary")
-        with col_reply2:
-            st.button("Save as Draft")
+        # Buttons
+        col1, col2, col3 = st.columns([2, 2, 8])  
+        with col1:
+            if st.button("Send", type="primary", use_container_width=True):  
+                # Handle send logic here
+                pass
+        with col2:
+            if st.button("Save Draft", use_container_width=True):  
+                # Handle draft saving logic here
+                pass
                     
 # Main mailbox function
 def render_chat_window():
@@ -460,6 +501,10 @@ def render_chat_window():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
     
+    # Chat input container
+    chat_input_container = st.empty()
+    user_question = chat_input_container.chat_input("Type your message...")
+    
     # Handle audio transcription
     if audio_bytes and 'audio_processed' not in st.session_state:
         try:
@@ -484,20 +529,16 @@ def render_chat_window():
             os.unlink(temp_audio_path)
 
             if hasattr(transcript, 'text'):
-                st.session_state.messages.append({
-                    "role": "user",
-                    "content": transcript.text
-                })
+                # Instead of directly adding to messages, set the chat input value
+                chat_input_container.empty()  # Clear the previous input
+                user_question = transcript.text
                 st.session_state.audio_processed = True
-                st.rerun()
 
         except Exception as e:
             st.error(f"Error during transcription: {str(e)}")
             logger.error(f"Audio transcription error: {str(e)}")
-
-    # Regular chat input
-    user_question = st.chat_input("Type your message...")
     
+    # Handle both text and transcribed input
     if user_question:
         st.session_state.messages.append({
             "role": "user", 
