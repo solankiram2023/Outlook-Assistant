@@ -6,9 +6,9 @@ The Outlook Email Management Assistant enables users to efficiently manage their
 ## Links
 
 ### Application Links
-Streamlit: http://3.145.99.178:8501/
+Streamlit: http://3.145.99.178:8501/      [SERVICE OFFLINE]
 
-FastAPI: http://3.145.99.178:8501/docs
+FastAPI: http://3.145.99.178:8501/docs    [SERVICE OFFLINE]
 
 ### Documentation
 Codelabs Link: https://codelabs-preview.appspot.com/?file_id=19F-oNrpfrvN73wmcrOozv6A72wKVv1PLru9mqvLXvps#0
