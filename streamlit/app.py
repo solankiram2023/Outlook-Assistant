@@ -26,6 +26,8 @@ if "name" not in st.session_state:
 if "preferred_username" not in st.session_state:
     st.session_state["preferred_username"] = preferred_username
 
+if token:
+    st.session_state.authenticated = True
 
 # Custom CSS
 with open("style.css") as f:
@@ -86,20 +88,24 @@ def sign_in_page():
     col1, col2, col3 = st.columns([3, 2, 3])
     
     with col2:
-        if st.button("Sign In with Microsoft", type="primary", use_container_width=True):
-            try:
-                base_url = os.getenv("FASTAPI_URL")
-                sign_in_url = f"{base_url}{os.getenv('SIGN_IN_ENDPOINT')}"
-                # Open in the same tab
-                js = f"""
-                <script>
-                    window.location.href = "{sign_in_url}";
-                </script>
-                """
-                st.components.v1.html(js, height=0)
-                st.session_state.authenticated = True
-            except Exception as e:
-                st.error(f"Error connecting to authentication server: {str(e)}")
+        base_url = os.getenv("FASTAPI_URL")
+        sign_in_url = f"{base_url}{os.getenv('SIGN_IN_ENDPOINT')}"
+        st.link_button("Sign In with Microsoft",sign_in_url, use_container_width=True)
+
+        # if st.button("Sign In with Microsoft", type="primary", use_container_width=True):
+        #     try:
+        #         base_url = os.getenv("FASTAPI_URL")
+        #         sign_in_url = f"{base_url}{os.getenv('SIGN_IN_ENDPOINT')}"
+        #         # Open in the same tab
+        #         js = f"""
+        #         <script>
+        #             window.location.href = "{sign_in_url}";
+        #         </script>
+        #         """
+        #         st.components.v1.html(js, height=0)
+        #         st.session_state.authenticated = True
+        #     except Exception as e:
+        #         st.error(f"Error connecting to authentication server: {str(e)}")
 
 def main():
     # Check authentication status

@@ -18,6 +18,10 @@ class RequestData(BaseModel):
     user_email: str
     email_context: EmailContext
 
+class EmailRequest(BaseModel):
+    user_email: str
+    response_output: dict
+
 
 # Start the router
 router  = APIRouter()
@@ -225,11 +229,11 @@ async def chatbot_handler(user_data: RequestData):
     description = "Endpoint to send a post request to send email response",
     tags        = ["Emails"]
 )
-def send_email_endpoint(user_email: str, response_output):
+def send_email_endpoint(request: EmailRequest):
 
     logger.info(f"ROUTES/EXTRAS - send_email_endpoint() - POST /send_email/ Request send an email")
 
-    response = send_mail_response(user_email, response_output)
+    response = send_mail_response(request.user_email, request.response_output)
 
     # Return the dictionary as a JSONResponse
     return JSONResponse(

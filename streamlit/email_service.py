@@ -163,7 +163,7 @@ class EmailService:
                         "user_input": user_input,
                         "user_email": user_email,
                         "email_context": {
-                            "email_id": email_id
+                            "email_id": '' if email_id is None else email_id
                         }
                     }
             logger.info(f"JSON: {data}")
@@ -183,5 +183,39 @@ class EmailService:
             return {
                 "status": 500,
                 "message": f"An error occurred while sending the user prompt: {e}",
+                "data": []
+            }
+        
+    def send_email(self, user_email: str, response_output):
+        """Sending response mail"""
+        try:
+            logger.info(f"Sending response mail")
+
+            logger.info(f"URL for chatbot: {self.base_url}{os.getenv('SEND_MAIL_ENDPOINT')}")
+            data = {
+                "user_email": user_email,
+                "response_output": {
+                    "subject": response_output["subject"],
+                    "body": response_output["body"],
+                    "recipient_email": response_output["recipient_email"]
+                }
+            }
+            logger.info(f"JSON: {data}")
+
+            # Make the POST request with JSON payload
+            response = requests.post(
+                url=f"{self.base_url}{os.getenv('SEND_MAIL_ENDPOINT')}",
+                json=data
+            )
+            response.raise_for_status()
+            logger.info(f"Response = {response.json()}")
+            
+            return response.json()
+                
+        except requests.RequestException as e:
+            logger.error(f"An error occurred while sending the email response: {e}")
+            return {
+                "status": 500,
+                "message": f"An error occurred while sending the email response: {e}",
                 "data": []
             }

@@ -62,7 +62,8 @@ def fetch_emails(folder_name):
                     )
                     AND f.display_name = %(folder_name)s
                 ORDER BY 
-                    e.received_datetime DESC;
+                    e.received_datetime DESC
+                LIMIT 10;
             """
             logger.info("UTILS/EMAILS - services/fetch_emails() - Executing SQL query")
             cursor.execute(query, {'folder_name': folder_name})
