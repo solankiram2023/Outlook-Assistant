@@ -27,9 +27,12 @@ app.include_router(router=extras.router)
 app.include_router(router=auth.router)
 
 # Run the server manually with Uvicorn
-if __name__ == "__main__":
+def main():
     uvicorn.run(
         app  = app,
         host = env["HOST_ADDRESS"],
         port = int(env["HOST_PORT"])
     )
+
+if __name__ == "__main__":
+    main()
