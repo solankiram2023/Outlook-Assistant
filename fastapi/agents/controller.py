@@ -40,6 +40,8 @@ def route(state):
     """ Route to determine the next node to call """
 
     messages = state.get("messages", [])
+
+    print("STATE CONTENTS: ", state)
     
     if messages and isinstance(messages[-1], AIMessage):
         ai_message = cast(AIMessage, messages[-1])
@@ -109,7 +111,7 @@ async def process_input(
     """ Process user input through the workflow """
     
     initial_state = AgentState(
-        messages             = message_history or [],
+        messages             = [],
         current_input        = user_input,
         email_context        = email_context or {},
         user_email           = user_email or None,
@@ -121,6 +123,15 @@ async def process_input(
     )
     
     final_state = await graph.ainvoke(initial_state, config=config_dict)
+
+    # Reset the state's content
+    initial_state["email_context"]          = {}
+    initial_state["corrected_prompt"]       = None
+    initial_state["rag_status"]             = None
+    initial_state["rag_response"]           = None
+    initial_state["conversation_summary"]   = None
+    initial_state["response_output"]        = None
+
 
     return {
         "current_input"        : final_state.get("current_input", None),
