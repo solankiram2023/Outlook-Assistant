@@ -36,9 +36,10 @@ class EmailRAGAgent:
         )
         
         self.llm = ChatOpenAI(
-            model_name  = "gpt-4o-mini",
+            model_name  = "gpt-4o",
             temperature = 0,
-            api_key     = os.getenv("OPENAI_API_KEY")
+            api_key     = os.getenv("OPENAI_API_KEY"),
+            top_p       = 0
         )
 
         self.email_vectorstore = None
@@ -229,8 +230,8 @@ class EmailRAGAgent:
         5. If multiple emails discuss the same topic, synthesize the information
         6. If attachments are relevant, explain their connection to the query
         7. If information is missing or unclear, explicitly state what's not available
-        8. Do not generalize answer, make sure to be restrictive to the email contents, and generate answer from the context
-        9. Answer should be specific to the question and email contents, do not generalize all emails and give an answer. If the answer generated is not specific to the question mention that you couldn't find specific information from email contents.
+        8. RESTRICTION: Do not generalize answer, make sure to be restrictive to the email contents, and generate answer from the context
+        9. RESTRICTION: Answer should be specific to the question and email contents, do not generalize all emails and give an answer. If the answer generated is not specific to the question mention that you couldn't find specific information from email contents.
 
         Context:
         {context}
@@ -239,7 +240,8 @@ class EmailRAGAgent:
         {question}
 
         Provide a clear, well-organized response that addresses the question directly and includes relevant details from the context. If summarizing multiple emails, structure the information logically.
-
+        Remember, if the context of the email is not relevant to the question, simply respond by saying that the context fetched is irrelevant to the question and end your response.
+        
         Response:
         """
         
