@@ -19,13 +19,6 @@ Demo Link: https://youtu.be/_GYDcoiDO7I
 ## Attestation and Team Contribution
 **WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK**
 
-Name | NUID | Contribution% | Work_Contributed
---- | --- | --- | --- |
-Sandeep Suresh Kumar | 002841297 | 33% | Endpoints for Microsoft SignIn, Triggering Airflow, Vector Embeddings for mail contents, mail attachment contents, Endpoint for Chatbot, Prompt Agent, Langgraph Implementation to handle multiple agents, CI/CD, Email Categorization
-Deepthi Nasika       | 002474582 | 33% | Token responses, Fetching mails with Microsoft Graph API, Processing mail contents, attachment contents into database, Setup Airflow, Endpoints for Mails with folder, RAG agent, Auto Response Agent, Streamlit for connecting with Fastapi endpoints
-Gomathy Selvamuthiah | 002410534 | 33% | Processing Mail Attachments, Endpoints for fetching and loading mails, Summarization agent, Streamlit Pages for Mailbox UI, Chatbot Interface, Audio to Text and Text to Audio Translation, Refreshing Mails, Search functionality
-Ramy Solanki         | 002816593 | 33% |  Prompt Correction Functionality, JWT tokens, OpenAI TTS & OpenAI Whisper, Email Categorizor, Dockerization, Github Actions
-
 ## Workflow
 
 ## Airflow
